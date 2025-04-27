@@ -1,0 +1,36 @@
+/* 
+This is a placeholder file. You would need to replace these with the actual Aktiv Grotesk font files.
+Aktiv Grotesk is a premium font that requires a license to use.
+*/
+
+@font-face {
+  font-family: "Aktiv Grotesk";
+  src: url("./AktivGrotesk-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Aktiv Grotesk";
+  src: url("./AktivGrotesk-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Aktiv Grotesk";
+  src: url("./AktivGrotesk-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Aktiv Grotesk";
+  src: url("./AktivGrotesk-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
