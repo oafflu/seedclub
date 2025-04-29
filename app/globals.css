@@ -1,0 +1,205 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 12%;
+
+    /* Primary colors */
+    --primary: 193 45% 23%; /* #204854 */
+    --primary-foreground: 0 0% 100%;
+    --primary-accent: 21 65% 57%; /* #d97a4b */
+
+    /* Secondary colors */
+    --secondary: 196 50% 31%; /* #286578 */
+    --secondary-foreground: 0 0% 100%;
+    --secondary-accent: 0 2% 87%; /* #dedddd */
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 21 65% 57%; /* #d97a4b */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 193 45% 23%;
+
+    --radius: 0.75rem;
+
+    /* Brand colors */
+    --ivory: 0 0% 100%; /* #ffffff */
+    --charcoal: 0 0% 12%; /* #1e1e1e */
+
+    /* Chart colors */
+    --chart-1: 193 45% 23%; /* #204854 */
+    --chart-2: 196 50% 31%; /* #286578 */
+    --chart-3: 21 65% 57%; /* #d97a4b */
+    --chart-4: 0 2% 87%; /* #dedddd */
+  }
+
+  .dark {
+    --background: 0 0% 12%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 100%;
+
+    /* Primary colors */
+    --primary: 193 45% 23%; /* #204854 */
+    --primary-foreground: 0 0% 100%;
+    --primary-accent: 21 65% 57%; /* #d97a4b */
+
+    /* Secondary colors */
+    --secondary: 196 50% 31%; /* #286578 */
+    --secondary-foreground: 0 0% 100%;
+    --secondary-accent: 0 2% 87%; /* #dedddd */
+
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 70%;
+
+    --accent: 21 65% 57%; /* #d97a4b */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 193 45% 23%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-bold;
+  }
+  h1 {
+    @apply text-3xl md:text-4xl;
+  }
+  h2 {
+    @apply text-2xl md:text-3xl;
+  }
+  h3 {
+    @apply text-xl md:text-2xl;
+  }
+  h4 {
+    @apply text-lg md:text-xl;
+  }
+  p {
+    @apply font-light;
+  }
+  strong,
+  b {
+    @apply font-medium;
+  }
+}
+
+/* Custom utility classes for brand colors */
+@layer utilities {
+  .bg-primary-teal {
+    background-color: #204854;
+  }
+  .bg-primary-orange {
+    background-color: #d97a4b;
+  }
+  .bg-secondary-teal {
+    background-color: #286578;
+  }
+  .bg-secondary-gray {
+    background-color: #dedddd;
+  }
+  .text-primary-teal {
+    color: #204854;
+  }
+  .text-primary-orange {
+    color: #d97a4b;
+  }
+  .text-secondary-teal {
+    color: #286578;
+  }
+  .text-secondary-gray {
+    color: #dedddd;
+  }
+
+  /* Typography utility classes */
+  .font-light {
+    font-weight: 300;
+  }
+  .font-medium {
+    font-weight: 500;
+  }
+  .font-bold {
+    font-weight: 700;
+  }
+}
+
+/* Add these animations for the water drops */
+@keyframes fall1 {
+  0% {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-10px, 60px);
+    opacity: 0;
+  }
+}
+
+@keyframes fall2 {
+  0% {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(5px, 70px);
+    opacity: 0;
+  }
+}
+
+@keyframes fall3 {
+  0% {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(15px, 65px);
+    opacity: 0;
+  }
+}
+
+.animate-fall-1 {
+  animation: fall1 1s ease-in infinite;
+  animation-delay: 0.1s;
+}
+
+.animate-fall-2 {
+  animation: fall2 1s ease-in infinite;
+  animation-delay: 0.3s;
+}
+
+.animate-fall-3 {
+  animation: fall3 1s ease-in infinite;
+  animation-delay: 0.5s;
+}
