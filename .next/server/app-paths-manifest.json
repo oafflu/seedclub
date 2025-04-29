@@ -1,7 +1,8 @@
 {
-  "/auth/login/page": "app/auth/login/page.js",
+  "/api/auth/admin/login/route": "app/api/auth/admin/login/route.js",
   "/page": "app/page.js",
-  "/mobile/page": "app/mobile/page.js",
-  "/admin/page": "app/admin/page.js",
+  "/about/page": "app/about/page.js",
+  "/careers/page": "app/careers/page.js",
+  "/blog/page": "app/blog/page.js",
   "/admin/login/page": "app/admin/login/page.js"
 }

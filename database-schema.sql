@@ -13,6 +13,9 @@ CREATE TABLE admin_users (
     role VARCHAR(50) NOT NULL DEFAULT 'admin',
     is_active BOOLEAN DEFAULT TRUE,
     last_login_at TIMESTAMP WITH TIME ZONE,
+    last_login_ip VARCHAR(45),
+    failed_login_attempts INTEGER DEFAULT 0,
+    locked_until TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -56,9 +59,9 @@ CREATE TABLE admin_user_roles (
 -- Audit Logs Table
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    admin_user_id UUID REFERENCES admin_users(id) ON DELETE SET NULL,
-    action VARCHAR(100) NOT NULL,
-    resource VARCHAR(100) NOT NULL,
+    user_id UUID NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    resource VARCHAR(50) NOT NULL,
     resource_id UUID,
     details JSONB,
     ip_address VARCHAR(45),
@@ -74,19 +77,16 @@ CREATE TABLE customers (
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     phone VARCHAR(20),
-    date_of_birth DATE,
-    address_line1 VARCHAR(255),
-    address_line2 VARCHAR(255),
-    city VARCHAR(100),
-    state VARCHAR(100),
-    postal_code VARCHAR(20),
-    country VARCHAR(100),
-    is_verified BOOLEAN DEFAULT FALSE,
-    verification_status VARCHAR(50) DEFAULT 'pending',
-    referral_code VARCHAR(20) UNIQUE,
-    referred_by UUID REFERENCES customers(id) ON DELETE SET NULL,
-    is_active BOOLEAN DEFAULT TRUE,
+    is_active BOOLEAN DEFAULT FALSE,
+    email_verified BOOLEAN DEFAULT FALSE,
+    verification_token VARCHAR(100),
+    verification_token_expires TIMESTAMP WITH TIME ZONE,
+    reset_token VARCHAR(100),
+    reset_token_expires TIMESTAMP WITH TIME ZONE,
     last_login_at TIMESTAMP WITH TIME ZONE,
+    last_login_ip VARCHAR(45),
+    failed_login_attempts INTEGER DEFAULT 0,
+    locked_until TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -397,21 +397,44 @@ CREATE TABLE system_alerts (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create indexes for performance
-CREATE INDEX idx_customers_email ON customers(email);
-CREATE INDEX idx_customers_referral_code ON customers(referral_code);
-CREATE INDEX idx_transactions_customer_id ON transactions(customer_id);
-CREATE INDEX idx_transactions_status ON transactions(status);
-CREATE INDEX idx_customer_jars_customer_id ON customer_jars(customer_id);
-CREATE INDEX idx_customer_jars_jar_id ON customer_jars(jar_id);
-CREATE INDEX idx_support_tickets_customer_id ON support_tickets(customer_id);
-CREATE INDEX idx_support_tickets_status ON support_tickets(status);
-CREATE INDEX idx_audit_logs_admin_user_id ON audit_logs(admin_user_id);
+-- Session Management Table
+CREATE TABLE active_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    user_type VARCHAR(20) NOT NULL, -- 'admin' or 'customer'
+    token TEXT NOT NULL,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes for better query performance
+CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX idx_audit_logs_action ON audit_logs(action);
 CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
-CREATE INDEX idx_blog_posts_slug ON blog_posts(slug);
-CREATE INDEX idx_blog_posts_published_at ON blog_posts(published_at);
-CREATE INDEX idx_marketing_pages_slug ON marketing_pages(slug);
-CREATE INDEX idx_referrals_referrer_id ON referrals(referrer_id);
+CREATE INDEX idx_active_sessions_user_id ON active_sessions(user_id);
+CREATE INDEX idx_active_sessions_token ON active_sessions(token);
+CREATE INDEX idx_active_sessions_expires_at ON active_sessions(expires_at);
+
+-- Add foreign key constraints
+ALTER TABLE audit_logs
+    ADD CONSTRAINT fk_audit_logs_admin_user
+    FOREIGN KEY (user_id) REFERENCES admin_users(id)
+    ON DELETE CASCADE;
+
+ALTER TABLE active_sessions
+    ADD CONSTRAINT fk_active_sessions_admin_user
+    FOREIGN KEY (user_id) REFERENCES admin_users(id)
+    ON DELETE CASCADE
+    WHEN (user_type = 'admin');
+
+ALTER TABLE active_sessions
+    ADD CONSTRAINT fk_active_sessions_customer
+    FOREIGN KEY (user_id) REFERENCES customers(id)
+    ON DELETE CASCADE
+    WHEN (user_type = 'customer');
 
 -- Create functions and triggers for updated_at timestamps
 CREATE OR REPLACE FUNCTION update_modified_column()

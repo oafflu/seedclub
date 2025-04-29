@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/components/ui/use-toast"
+import { supabase } from "@/lib/supabase/client"
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState("")
@@ -50,35 +51,52 @@ export default function RegisterPage() {
     }
 
     try {
-      // In a real app, you would register the user with an API
-      // This is just a mock for demonstration
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // Mock successful registration
-      localStorage.setItem("isAuthenticated", "true")
-      localStorage.setItem("userEmail", email)
-      localStorage.setItem("userName", fullName.split(" ")[0])
-
-      toast({
-        title: "Registration successful",
-        description: "Welcome to Seed Club!",
+      // Sign up with Supabase Auth
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
       })
 
-      // Redirect to dashboard
-      router.push("/mobile")
-    } catch (error) {
+      if (signUpError) throw signUpError
+
+      if (authData.user) {
+        // Insert into profiles table
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: authData.user.id,
+              full_name: fullName,
+              email: email,
+              role: 'customer', // Default role
+              created_at: new Date().toISOString(),
+            },
+          ])
+
+        if (profileError) throw profileError
+
+        toast({
+          title: "Registration successful",
+          description: "Welcome to Seed Club! Please check your email to verify your account.",
+        })
+
+        // Redirect to login page
+        router.push("/auth/login")
+      }
+    } catch (error: any) {
       toast({
         title: "Registration failed",
-        description: "There was an error creating your account. Please try again.",
+        description: error.message || "There was an error creating your account. Please try again.",
         variant: "destructive",
       })
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const toggleShowPassword = () => {
-    setShowPassword(!showPassword)
   }
 
   return (
@@ -131,7 +149,7 @@ export default function RegisterPage() {
                   variant="ghost"
                   size="icon"
                   className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={toggleShowPassword}
+                  onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
@@ -153,7 +171,7 @@ export default function RegisterPage() {
                   variant="ghost"
                   size="icon"
                   className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={toggleShowPassword}
+                  onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
@@ -167,7 +185,7 @@ export default function RegisterPage() {
                   Terms of Service
                 </Link>{" "}
                 and{" "}
-                <Link href="/privacy" className="text-primary hover:underline">
+                <Link href="/privacy" className="underline">
                   Privacy Policy
                 </Link>
               </label>

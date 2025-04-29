@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Save, RefreshCw, CheckCircle, Lock, Mail, Bell, DollarSign, Percent, Clock, CreditCard } from "lucide-react"
+import { Save, RefreshCw, CheckCircle, Lock, Mail, Bell, DollarSign, Percent, Clock, CreditCard, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -13,19 +13,142 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { toast } from "sonner"
 
 export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
 
-  const handleSave = () => {
-    setSaving(true)
-    // Simulate API call
-    setTimeout(() => {
-      setSaving(false)
+  // Stripe configuration state
+  const [stripeConfig, setStripeConfig] = useState({
+    enabled: true,
+    publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
+    secretKey: '',
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
+    paymentMethods: {
+      cards: true,
+      ach: false,
+      sepa: false
+    }
+  })
+
+  // SendGrid configuration state
+  const [sendGridConfig, setSendGridConfig] = useState({
+    enabled: true,
+    apiKey: process.env.SENDGRID_API_KEY || ''
+  })
+
+  // Twilio configuration state
+  const [twilioConfig, setTwilioConfig] = useState({
+    enabled: false,
+    accountSid: process.env.TWILIO_ACCOUNT_SID || '',
+    authToken: process.env.TWILIO_AUTH_TOKEN || '',
+    phoneNumber: process.env.TWILIO_PHONE_NUMBER || ''
+  })
+
+  // reCAPTCHA configuration state
+  const [recaptchaConfig, setRecaptchaConfig] = useState({
+    enabled: true,
+    siteKey: process.env.RECAPTCHA_SITE_KEY || '',
+    secretKey: process.env.RECAPTCHA_SECRET_KEY || ''
+  })
+
+  const handleStripeChange = (field: string, value: any) => {
+    setStripeConfig(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleStripePaymentMethodChange = (method: keyof typeof stripeConfig.paymentMethods) => {
+    setStripeConfig(prev => ({
+      ...prev,
+      paymentMethods: {
+        ...prev.paymentMethods,
+        [method]: !prev.paymentMethods[method]
+      }
+    }))
+  }
+
+  const handleSendGridChange = (field: string, value: any) => {
+    setSendGridConfig(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleTwilioChange = (field: string, value: any) => {
+    setTwilioConfig(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleRecaptchaChange = (field: string, value: any) => {
+    setRecaptchaConfig(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleSaveStripeSettings = async () => {
+    try {
+      setSaving(true)
+      // Here you would typically make an API call to save the settings
+      // For example:
+      // await fetch('/api/admin/settings/stripe', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify(stripeConfig)
+      // })
+      
+      toast.success('Stripe settings saved successfully')
       setSavedSuccess(true)
       setTimeout(() => setSavedSuccess(false), 3000)
-    }, 1000)
+    } catch (error) {
+      console.error('Error saving Stripe settings:', error)
+      toast.error('Failed to save Stripe settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveIntegrations = async () => {
+    try {
+      setSaving(true)
+      // Here you would typically make API calls to save all integration settings
+      // await Promise.all([
+      //   fetch('/api/admin/settings/sendgrid', { method: 'POST', body: JSON.stringify(sendGridConfig) }),
+      //   fetch('/api/admin/settings/twilio', { method: 'POST', body: JSON.stringify(twilioConfig) }),
+      //   fetch('/api/admin/settings/recaptcha', { method: 'POST', body: JSON.stringify(recaptchaConfig) })
+      // ])
+      
+      toast.success('Integration settings saved successfully')
+      setSavedSuccess(true)
+      setTimeout(() => setSavedSuccess(false), 3000)
+    } catch (error) {
+      console.error('Error saving integration settings:', error)
+      toast.error('Failed to save integration settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      // Save all settings including Stripe
+      await handleSaveStripeSettings()
+      // Add other settings save logic here
+      
+      setSavedSuccess(true)
+      setTimeout(() => setSavedSuccess(false), 3000)
+    } catch (error) {
+      console.error('Error saving settings:', error)
+      toast.error('Failed to save settings')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -704,52 +827,108 @@ export default function SettingsPage() {
                       <p className="text-sm text-muted-foreground">Credit card and bank transfer processing</p>
                     </div>
                   </div>
-                  <Switch id="stripe-enabled" defaultChecked />
+                  <Switch
+                    id="stripe-enabled"
+                    checked={stripeConfig.enabled}
+                    onCheckedChange={(checked) => handleStripeChange('enabled', checked)}
+                  />
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="stripe-public-key">Public Key</Label>
-                    <Input id="stripe-public-key" defaultValue="pk_test_..." type="password" />
+                    <Label htmlFor="stripe-public-key">Publishable Key</Label>
+                    <Input
+                      id="stripe-public-key"
+                      type="text"
+                      placeholder="pk_test_..."
+                      value={stripeConfig.publishableKey}
+                      onChange={(e) => handleStripeChange('publishableKey', e.target.value)}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Your Stripe publishable key (starts with pk_)
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="stripe-secret-key">Secret Key</Label>
-                    <Input id="stripe-secret-key" defaultValue="sk_test_..." type="password" />
+                    <Input
+                      id="stripe-secret-key"
+                      type="password"
+                      placeholder="sk_test_..."
+                      value={stripeConfig.secretKey}
+                      onChange={(e) => handleStripeChange('secretKey', e.target.value)}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Your Stripe secret key (starts with sk_)
+                    </p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="stripe-webhook-secret">Webhook Secret</Label>
-                  <Input id="stripe-webhook-secret" defaultValue="whsec_..." type="password" />
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-md bg-primary/10 p-2">
-                      <DollarSign className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-medium">PayPal</h3>
-                      <p className="text-sm text-muted-foreground">PayPal payment processing</p>
-                    </div>
-                  </div>
-                  <Switch id="paypal-enabled" />
+                  <Input
+                    id="stripe-webhook-secret"
+                    type="password"
+                    placeholder="whsec_..."
+                    value={stripeConfig.webhookSecret}
+                    onChange={(e) => handleStripeChange('webhookSecret', e.target.value)}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Your Stripe webhook signing secret (starts with whsec_)
+                  </p>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium">Payment Methods</h4>
                   <div className="space-y-2">
-                    <Label htmlFor="paypal-client-id">Client ID</Label>
-                    <Input id="paypal-client-id" placeholder="Enter PayPal client ID" />
+                    <Label htmlFor="stripe-cards" className="flex items-center justify-between">
+                      <span>Credit & Debit Cards</span>
+                      <Switch
+                        id="stripe-cards"
+                        checked={stripeConfig.paymentMethods.cards}
+                        onCheckedChange={() => handleStripePaymentMethodChange('cards')}
+                      />
+                    </Label>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="paypal-secret">Client Secret</Label>
-                    <Input id="paypal-secret" placeholder="Enter PayPal client secret" type="password" />
+                    <Label htmlFor="stripe-ach" className="flex items-center justify-between">
+                      <span>ACH Direct Debit (US)</span>
+                      <Switch
+                        id="stripe-ach"
+                        checked={stripeConfig.paymentMethods.ach}
+                        onCheckedChange={() => handleStripePaymentMethodChange('ach')}
+                      />
+                    </Label>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="stripe-sepa" className="flex items-center justify-between">
+                      <span>SEPA Direct Debit (EU)</span>
+                      <Switch
+                        id="stripe-sepa"
+                        checked={stripeConfig.paymentMethods.sepa}
+                        onCheckedChange={() => handleStripePaymentMethodChange('sepa')}
+                      />
+                    </Label>
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Webhook Endpoint</Label>
+                  <div className="p-4 bg-muted rounded-lg">
+                    <code className="text-sm break-all">
+                      {`${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/stripe`}
+                    </code>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Use this URL in your Stripe Dashboard webhook settings
+                  </p>
+                </div>
+
+                <Button
+                  onClick={handleSaveStripeSettings}
+                  disabled={saving}
+                >
+                  {saving ? 'Saving...' : 'Save Stripe Settings'}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -771,12 +950,22 @@ export default function SettingsPage() {
                       <p className="text-sm text-muted-foreground">Email delivery service</p>
                     </div>
                   </div>
-                  <Switch id="sendgrid-enabled" defaultChecked />
+                  <Switch
+                    id="sendgrid-enabled"
+                    checked={sendGridConfig.enabled}
+                    onCheckedChange={(checked) => handleSendGridChange('enabled', checked)}
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="sendgrid-api-key">API Key</Label>
-                  <Input id="sendgrid-api-key" defaultValue="SG..." type="password" />
+                  <Input
+                    id="sendgrid-api-key"
+                    type="password"
+                    value={sendGridConfig.apiKey}
+                    onChange={(e) => handleSendGridChange('apiKey', e.target.value)}
+                    placeholder="SG..."
+                  />
                 </div>
               </div>
 
@@ -793,23 +982,43 @@ export default function SettingsPage() {
                       <p className="text-sm text-muted-foreground">SMS notification service</p>
                     </div>
                   </div>
-                  <Switch id="twilio-enabled" />
+                  <Switch
+                    id="twilio-enabled"
+                    checked={twilioConfig.enabled}
+                    onCheckedChange={(checked) => handleTwilioChange('enabled', checked)}
+                  />
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="twilio-account-sid">Account SID</Label>
-                    <Input id="twilio-account-sid" placeholder="Enter Twilio Account SID" />
+                    <Input
+                      id="twilio-account-sid"
+                      value={twilioConfig.accountSid}
+                      onChange={(e) => handleTwilioChange('accountSid', e.target.value)}
+                      placeholder="Enter Twilio Account SID"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="twilio-auth-token">Auth Token</Label>
-                    <Input id="twilio-auth-token" placeholder="Enter Twilio Auth Token" type="password" />
+                    <Input
+                      id="twilio-auth-token"
+                      type="password"
+                      value={twilioConfig.authToken}
+                      onChange={(e) => handleTwilioChange('authToken', e.target.value)}
+                      placeholder="Enter Twilio Auth Token"
+                    />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="twilio-phone-number">Phone Number</Label>
-                  <Input id="twilio-phone-number" placeholder="Enter Twilio Phone Number" />
+                  <Input
+                    id="twilio-phone-number"
+                    value={twilioConfig.phoneNumber}
+                    onChange={(e) => handleTwilioChange('phoneNumber', e.target.value)}
+                    placeholder="Enter Twilio Phone Number"
+                  />
                 </div>
               </div>
 
@@ -819,27 +1028,49 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="rounded-md bg-primary/10 p-2">
-                      <Lock className="h-5 w-5 text-primary" />
+                      <Shield className="h-5 w-5 text-primary" />
                     </div>
                     <div>
                       <h3 className="text-base font-medium">reCAPTCHA</h3>
                       <p className="text-sm text-muted-foreground">Bot protection service</p>
                     </div>
                   </div>
-                  <Switch id="recaptcha-enabled" defaultChecked />
+                  <Switch
+                    id="recaptcha-enabled"
+                    checked={recaptchaConfig.enabled}
+                    onCheckedChange={(checked) => handleRecaptchaChange('enabled', checked)}
+                  />
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="recaptcha-site-key">Site Key</Label>
-                    <Input id="recaptcha-site-key" defaultValue="6Lc..." />
+                    <Input
+                      id="recaptcha-site-key"
+                      value={recaptchaConfig.siteKey}
+                      onChange={(e) => handleRecaptchaChange('siteKey', e.target.value)}
+                      placeholder="6Lc..."
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="recaptcha-secret-key">Secret Key</Label>
-                    <Input id="recaptcha-secret-key" defaultValue="6Lc..." type="password" />
+                    <Input
+                      id="recaptcha-secret-key"
+                      type="password"
+                      value={recaptchaConfig.secretKey}
+                      onChange={(e) => handleRecaptchaChange('secretKey', e.target.value)}
+                      placeholder="6Lc..."
+                    />
                   </div>
                 </div>
               </div>
+
+              <Button
+                onClick={handleSaveIntegrations}
+                disabled={saving}
+              >
+                {saving ? 'Saving...' : 'Save Integration Settings'}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
