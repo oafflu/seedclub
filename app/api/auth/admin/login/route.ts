@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createSession } from '@/lib/auth'
+import { compare } from 'bcryptjs'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
     // Check if user exists and is an admin
     const { data: adminUser, error: userError } = await supabase
       .from('admin_users')
-      .select('id, email, password_hash, role, is_active, failed_login_attempts, locked_until')
+      .select('id, email, encrypted_password, role, is_active, failed_login_attempts, locked_until')
       .eq('email', email.toLowerCase())
       .single()
 
@@ -53,15 +54,9 @@ export async function POST(request: Request) {
     }
 
     // Verify password
-    const { data: pwData, error: pwError } = await supabase.rpc(
-      'verify_admin_password',
-      {
-        email: email.toLowerCase(),
-        password_attempt: password
-      }
-    )
+    const isValidPassword = await compare(password, adminUser.encrypted_password)
 
-    if (pwError || !pwData) {
+    if (!isValidPassword) {
       // Increment failed login attempts
       const newAttempts = (adminUser.failed_login_attempts || 0) + 1
       const shouldLock = newAttempts >= 5
@@ -127,7 +122,7 @@ export async function POST(request: Request) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 // 24 hours in seconds
+      maxAge: 60 * 60 * 24 * 1000 // 24 hours in milliseconds
     })
 
     // Create audit log

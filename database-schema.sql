@@ -410,6 +410,23 @@ CREATE TABLE active_sessions (
     last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Email Settings Table
+CREATE TABLE IF NOT EXISTS email_settings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  provider VARCHAR(50) NOT NULL,
+  active BOOLEAN DEFAULT true,
+  from_email VARCHAR(255) NOT NULL,
+  smtp_config JSONB,
+  sendgrid_config JSONB,
+  gmail_config JSONB,
+  microsoft_config JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create unique constraint to ensure only one active configuration
+CREATE UNIQUE INDEX IF NOT EXISTS idx_email_settings_single_row ON email_settings ((true));
+
 -- Create indexes for better query performance
 CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX idx_audit_logs_action ON audit_logs(action);

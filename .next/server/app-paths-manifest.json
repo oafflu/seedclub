@@ -1,8 +1,8 @@
 {
-  "/api/auth/admin/login/route": "app/api/auth/admin/login/route.js",
-  "/page": "app/page.js",
-  "/about/page": "app/about/page.js",
-  "/careers/page": "app/careers/page.js",
-  "/blog/page": "app/blog/page.js",
-  "/admin/login/page": "app/admin/login/page.js"
+  "/admin/page": "app/admin/page.js",
+  "/admin/dashboard/page": "app/admin/dashboard/page.js",
+  "/admin/settings/page": "app/admin/settings/page.js",
+  "/admin/notifications/page": "app/admin/notifications/page.js",
+  "/admin/profile/page": "app/admin/profile/page.js",
+  "/admin/users-roles/page": "app/admin/users-roles/page.js"
 }

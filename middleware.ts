@@ -23,7 +23,7 @@ const customerProtectedPaths = [
   '/mobile/referrals',
 ]
 
-// Define public paths that don't need authentication
+// List of public paths that don't require authentication
 const publicPaths = [
   '/',
   '/about',
@@ -38,39 +38,47 @@ const publicPaths = [
   '/auth/login',
   '/auth/register',
   '/auth/forgot-password',
+  '/auth/reset-password',
+  '/api/auth/admin/login',
+  '/api/auth/login',
+  '/api/auth/register',
   '/admin/login',
+]
+
+// Admin paths that require admin authentication
+const adminPaths = [
+  '/admin',
+  '/api/admin',
 ]
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Allow public paths
-  if (publicPaths.some(path => pathname === path || pathname.startsWith('/blog/'))) {
+  if (publicPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next()
   }
 
   // Handle admin routes
-  if (pathname.startsWith('/admin')) {
-    const adminSession = request.cookies.get('admin_token')
-    
-    // Redirect to admin login if no session and trying to access protected admin path
-    if (!adminSession && pathname !== '/admin/login') {
+  if (adminPaths.some(path => pathname.startsWith(path))) {
+    const adminToken = request.cookies.get('admin_token')
+    if (!adminToken && !pathname.startsWith('/admin/login')) {
       return NextResponse.redirect(new URL('/admin/login', request.url))
     }
 
     // Allow access to login page if no session
-    if (pathname === '/admin/login' && !adminSession) {
+    if (pathname === '/admin/login' && !adminToken) {
       return NextResponse.next()
     }
 
     // Redirect to dashboard if already logged in and trying to access login page
-    if (pathname === '/admin/login' && adminSession) {
+    if (pathname === '/admin/login' && adminToken) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url))
     }
 
     // Check role-based access for protected admin paths
-    if (adminSession) {
-      const userRole = adminSession.value ? JSON.parse(adminSession.value).role : null
+    if (adminToken) {
+      const userRole = JSON.parse(adminToken.value).role
       const requiredRoles = protectedPaths[pathname as keyof typeof protectedPaths]
 
       if (requiredRoles && !requiredRoles.includes(userRole)) {
@@ -109,13 +117,12 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except:
-     * 1. _next/static (static files)
-     * 2. _next/image (image optimization files)
-     * 3. favicon.ico (favicon file)
-     * 4. public folder
-     * 5. api routes (handled separately)
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public (public files)
      */
-    '/((?!_next/static|_next/image|favicon.ico|public|api).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public|images).*)',
   ],
 } 

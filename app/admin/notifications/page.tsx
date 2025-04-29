@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { toast } from "sonner"
+import { supabase } from "@/lib/supabase/client"
+import { pusherClient, NOTIFICATION_CHANNELS, NOTIFICATION_EVENTS } from "@/lib/pusher"
+import { useAuth } from "@/hooks/use-auth"
 
 // Mock notification data
 const mockNotifications = [
@@ -111,10 +115,65 @@ const mockNotifications = [
 ]
 
 export default function AdminNotificationsPage() {
-  const [notifications, setNotifications] = useState(mockNotifications)
+  const [notifications, setNotifications] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedType, setSelectedType] = useState("all")
   const [selectedPriority, setSelectedPriority] = useState("all")
+  const [loading, setLoading] = useState(true)
+  const { user } = useAuth()
+
+  // Fetch notifications from database
+  const fetchNotifications = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('recipient_id', user?.id)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setNotifications(data || [])
+    } catch (error) {
+      console.error('Error fetching notifications:', error)
+      toast.error('Failed to load notifications')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Subscribe to real-time notifications
+  useEffect(() => {
+    if (!user?.id) return
+
+    // Subscribe to personal notification channel
+    const channel = pusherClient.subscribe(`${NOTIFICATION_CHANNELS.ADMIN}-${user.id}`)
+
+    // Handle new notifications
+    channel.bind(NOTIFICATION_EVENTS.NEW, (notification: any) => {
+      setNotifications(prev => [notification, ...prev])
+      toast(`New Notification: ${notification.title}`)
+    })
+
+    // Handle notification updates
+    channel.bind(NOTIFICATION_EVENTS.UPDATE, (updatedNotification: any) => {
+      setNotifications(prev =>
+        prev.map(n => (n.id === updatedNotification.id ? updatedNotification : n))
+      )
+    })
+
+    // Handle notification deletions
+    channel.bind(NOTIFICATION_EVENTS.DELETE, (deletedId: string) => {
+      setNotifications(prev => prev.filter(n => n.id !== deletedId))
+    })
+
+    // Initial fetch
+    fetchNotifications()
+
+    // Cleanup
+    return () => {
+      pusherClient.unsubscribe(`${NOTIFICATION_CHANNELS.ADMIN}-${user.id}`)
+    }
+  }, [user?.id])
 
   const unreadCount = notifications.filter((n) => !n.read).length
 
@@ -133,20 +192,74 @@ export default function AdminNotificationsPage() {
     return matchesSearch && matchesType && matchesPriority
   })
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map((n) => ({ ...n, read: true })))
+  const markAllAsRead = async () => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true, read_at: new Date().toISOString() })
+        .eq('recipient_id', user?.id)
+        .eq('read', false)
+
+      if (error) throw error
+
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+      toast('All notifications marked as read')
+    } catch (error) {
+      console.error('Error marking notifications as read:', error)
+      toast.error('Failed to mark notifications as read')
+    }
   }
 
-  const markAsRead = (id: number) => {
-    setNotifications(notifications.map((n) => (n.id === id ? { ...n, read: true } : n)))
+  const markAsRead = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true, read_at: new Date().toISOString() })
+        .eq('id', id)
+
+      if (error) throw error
+
+      setNotifications(prev =>
+        prev.map(n => (n.id === id ? { ...n, read: true } : n))
+      )
+    } catch (error) {
+      console.error('Error marking notification as read:', error)
+      toast.error('Failed to mark notification as read')
+    }
   }
 
-  const deleteNotification = (id: number) => {
-    setNotifications(notifications.filter((n) => n.id !== id))
+  const deleteNotification = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+
+      setNotifications(prev => prev.filter(n => n.id !== id))
+      toast('Notification deleted')
+    } catch (error) {
+      console.error('Error deleting notification:', error)
+      toast.error('Failed to delete notification')
+    }
   }
 
-  const clearAllNotifications = () => {
-    setNotifications([])
+  const clearAllNotifications = async () => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('recipient_id', user?.id)
+
+      if (error) throw error
+
+      setNotifications([])
+      toast('All notifications cleared')
+    } catch (error) {
+      console.error('Error clearing notifications:', error)
+      toast.error('Failed to clear notifications')
+    }
   }
 
   return (
@@ -355,8 +468,8 @@ interface NotificationItemProps {
     type: string
     priority: string
   }
-  onMarkAsRead: (id: number) => void
-  onDelete: (id: number) => void
+  onMarkAsRead: (id: string) => void
+  onDelete: (id: string) => void
 }
 
 function NotificationItem({ notification, onMarkAsRead, onDelete }: NotificationItemProps) {
@@ -397,11 +510,11 @@ function NotificationItem({ notification, onMarkAsRead, onDelete }: Notification
       </div>
       <div className="flex gap-1">
         {!notification.read && (
-          <Button variant="ghost" size="icon" onClick={() => onMarkAsRead(notification.id)} title="Mark as read">
+          <Button variant="ghost" size="icon" onClick={() => onMarkAsRead(notification.id.toString())} title="Mark as read">
             <Check className="h-4 w-4" />
           </Button>
         )}
-        <Button variant="ghost" size="icon" onClick={() => onDelete(notification.id)} title="Delete notification">
+        <Button variant="ghost" size="icon" onClick={() => onDelete(notification.id.toString())} title="Delete notification">
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -410,6 +523,54 @@ function NotificationItem({ notification, onMarkAsRead, onDelete }: Notification
 }
 
 function NotificationSettings() {
+  const { user } = useAuth()
+  const [settings, setSettings] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    fetchSettings()
+  }, [user?.id])
+
+  const fetchSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('notification_settings')
+        .select('*')
+        .eq('user_id', user?.id)
+        .single()
+
+      if (error) throw error
+      setSettings(data)
+    } catch (error) {
+      console.error('Error fetching notification settings:', error)
+      toast.error('Failed to load notification settings')
+    }
+  }
+
+  const saveSettings = async () => {
+    try {
+      setSaving(true)
+      const { error } = await supabase
+        .from('notification_settings')
+        .upsert({
+          user_id: user?.id,
+          email_notifications: settings.email_notifications,
+          push_notifications: settings.push_notifications,
+          sms_notifications: settings.sms_notifications
+        })
+
+      if (error) throw error
+      toast.success('Settings saved successfully')
+    } catch (error) {
+      console.error('Error saving notification settings:', error)
+      toast.error('Failed to save settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!settings) return <div>Loading settings...</div>
+
   return (
     <div className="space-y-6">
       <div>
@@ -421,7 +582,7 @@ function NotificationSettings() {
               <p className="text-sm text-muted-foreground">Receive notifications for new customer registrations</p>
             </div>
             <div className="flex items-center space-x-2">
-              <Select defaultValue="important">
+              <Select value={settings.email_notifications.customer_registrations} onValueChange={(value) => setSettings({ ...settings, email_notifications: { ...settings.email_notifications, customer_registrations: value } })}>
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -440,7 +601,7 @@ function NotificationSettings() {
               <p className="text-sm text-muted-foreground">Receive notifications for transactions</p>
             </div>
             <div className="flex items-center space-x-2">
-              <Select defaultValue="all">
+              <Select value={settings.email_notifications.transaction_alerts} onValueChange={(value) => setSettings({ ...settings, email_notifications: { ...settings.email_notifications, transaction_alerts: value } })}>
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -459,7 +620,7 @@ function NotificationSettings() {
               <p className="text-sm text-muted-foreground">Receive notifications for system events</p>
             </div>
             <div className="flex items-center space-x-2">
-              <Select defaultValue="all">
+              <Select value={settings.email_notifications.system_alerts} onValueChange={(value) => setSettings({ ...settings, email_notifications: { ...settings.email_notifications, system_alerts: value } })}>
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -478,7 +639,7 @@ function NotificationSettings() {
               <p className="text-sm text-muted-foreground">Receive notifications for support tickets</p>
             </div>
             <div className="flex items-center space-x-2">
-              <Select defaultValue="important">
+              <Select value={settings.email_notifications.support_tickets} onValueChange={(value) => setSettings({ ...settings, email_notifications: { ...settings.email_notifications, support_tickets: value } })}>
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -502,7 +663,7 @@ function NotificationSettings() {
               <p className="text-sm text-muted-foreground">Receive push notifications in your browser</p>
             </div>
             <div className="flex items-center space-x-2">
-              <Select defaultValue="enabled">
+              <Select value={settings.push_notifications.enabled} onValueChange={(value) => setSettings({ ...settings, push_notifications: { ...settings.push_notifications, enabled: value } })}>
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -525,7 +686,7 @@ function NotificationSettings() {
               <p className="text-sm text-muted-foreground">Receive SMS for critical system alerts</p>
             </div>
             <div className="flex items-center space-x-2">
-              <Select defaultValue="enabled">
+              <Select value={settings.sms_notifications.critical_alerts} onValueChange={(value) => setSettings({ ...settings, sms_notifications: { ...settings.sms_notifications, critical_alerts: value } })}>
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -540,7 +701,7 @@ function NotificationSettings() {
       </div>
 
       <div className="flex justify-end">
-        <Button>Save Settings</Button>
+        <Button onClick={saveSettings} disabled={saving}>Save Settings</Button>
       </div>
     </div>
   )

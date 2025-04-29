@@ -53,6 +53,30 @@ export default function SettingsPage() {
     secretKey: process.env.RECAPTCHA_SECRET_KEY || ''
   })
 
+  // Gmail configuration state
+  const [gmailConfig, setGmailConfig] = useState({
+    enabled: false,
+    email: '',
+    appPassword: ''
+  })
+
+  // Microsoft configuration state
+  const [microsoftConfig, setMicrosoftConfig] = useState({
+    enabled: false,
+    clientId: '',
+    clientSecret: '',
+    tenantId: ''
+  })
+
+  // Add Pusher configuration state
+  const [pusherConfig, setPusherConfig] = useState({
+    enabled: true,
+    appId: process.env.NEXT_PUBLIC_PUSHER_APP_ID || '',
+    key: process.env.NEXT_PUBLIC_PUSHER_KEY || '',
+    secret: process.env.PUSHER_SECRET || '',
+    cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || ''
+  })
+
   const handleStripeChange = (field: string, value: any) => {
     setStripeConfig(prev => ({
       ...prev,
@@ -91,6 +115,27 @@ export default function SettingsPage() {
     }))
   }
 
+  const handleGmailChange = (field: string, value: any) => {
+    setGmailConfig(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleMicrosoftChange = (field: string, value: any) => {
+    setMicrosoftConfig(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handlePusherChange = (field: string, value: any) => {
+    setPusherConfig(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
   const handleSaveStripeSettings = async () => {
     try {
       setSaving(true)
@@ -119,7 +164,10 @@ export default function SettingsPage() {
       // Here you would typically make API calls to save all integration settings
       // await Promise.all([
       //   fetch('/api/admin/settings/sendgrid', { method: 'POST', body: JSON.stringify(sendGridConfig) }),
+      //   fetch('/api/admin/settings/gmail', { method: 'POST', body: JSON.stringify(gmailConfig) }),
+      //   fetch('/api/admin/settings/microsoft', { method: 'POST', body: JSON.stringify(microsoftConfig) }),
       //   fetch('/api/admin/settings/twilio', { method: 'POST', body: JSON.stringify(twilioConfig) }),
+      //   fetch('/api/admin/settings/pusher', { method: 'POST', body: JSON.stringify(pusherConfig) }),
       //   fetch('/api/admin/settings/recaptcha', { method: 'POST', body: JSON.stringify(recaptchaConfig) })
       // ])
       
@@ -975,6 +1023,106 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="rounded-md bg-primary/10 p-2">
+                      <Mail className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-medium">Gmail</h3>
+                      <p className="text-sm text-muted-foreground">Gmail SMTP service</p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="gmail-enabled"
+                    checked={gmailConfig.enabled}
+                    onCheckedChange={(checked) => handleGmailChange('enabled', checked)}
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="gmail-email">Gmail Address</Label>
+                    <Input
+                      id="gmail-email"
+                      type="email"
+                      value={gmailConfig.email}
+                      onChange={(e) => handleGmailChange('email', e.target.value)}
+                      placeholder="your-email@gmail.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gmail-app-password">App Password</Label>
+                    <Input
+                      id="gmail-app-password"
+                      type="password"
+                      value={gmailConfig.appPassword}
+                      onChange={(e) => handleGmailChange('appPassword', e.target.value)}
+                      placeholder="16-character app password"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Generate an App Password from your Google Account settings
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-md bg-primary/10 p-2">
+                      <Mail className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-medium">Microsoft 365</h3>
+                      <p className="text-sm text-muted-foreground">Microsoft 365 email service</p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="microsoft-enabled"
+                    checked={microsoftConfig.enabled}
+                    onCheckedChange={(checked) => handleMicrosoftChange('enabled', checked)}
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="microsoft-client-id">Client ID</Label>
+                    <Input
+                      id="microsoft-client-id"
+                      value={microsoftConfig.clientId}
+                      onChange={(e) => handleMicrosoftChange('clientId', e.target.value)}
+                      placeholder="Enter Azure AD Client ID"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="microsoft-client-secret">Client Secret</Label>
+                    <Input
+                      id="microsoft-client-secret"
+                      type="password"
+                      value={microsoftConfig.clientSecret}
+                      onChange={(e) => handleMicrosoftChange('clientSecret', e.target.value)}
+                      placeholder="Enter Azure AD Client Secret"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="microsoft-tenant-id">Tenant ID</Label>
+                  <Input
+                    id="microsoft-tenant-id"
+                    value={microsoftConfig.tenantId}
+                    onChange={(e) => handleMicrosoftChange('tenantId', e.target.value)}
+                    placeholder="Enter Azure AD Tenant ID"
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-md bg-primary/10 p-2">
                       <Bell className="h-5 w-5 text-primary" />
                     </div>
                     <div>
@@ -1062,6 +1210,94 @@ export default function SettingsPage() {
                       placeholder="6Lc..."
                     />
                   </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-md bg-primary/10 p-2">
+                      <Bell className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-medium">Pusher</h3>
+                      <p className="text-sm text-muted-foreground">Real-time notifications service</p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="pusher-enabled"
+                    checked={pusherConfig.enabled}
+                    onCheckedChange={(checked) => handlePusherChange('enabled', checked)}
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="pusher-app-id">App ID</Label>
+                    <Input
+                      id="pusher-app-id"
+                      value={pusherConfig.appId}
+                      onChange={(e) => handlePusherChange('appId', e.target.value)}
+                      placeholder="Enter Pusher App ID"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pusher-key">Key</Label>
+                    <Input
+                      id="pusher-key"
+                      value={pusherConfig.key}
+                      onChange={(e) => handlePusherChange('key', e.target.value)}
+                      placeholder="Enter Pusher Key"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="pusher-secret">Secret</Label>
+                    <Input
+                      id="pusher-secret"
+                      type="password"
+                      value={pusherConfig.secret}
+                      onChange={(e) => handlePusherChange('secret', e.target.value)}
+                      placeholder="Enter Pusher Secret"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pusher-cluster">Cluster</Label>
+                    <Select 
+                      value={pusherConfig.cluster}
+                      onValueChange={(value) => handlePusherChange('cluster', value)}
+                    >
+                      <SelectTrigger id="pusher-cluster">
+                        <SelectValue placeholder="Select cluster" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mt1">mt1 (US East)</SelectItem>
+                        <SelectItem value="us2">us2 (US West)</SelectItem>
+                        <SelectItem value="us3">us3 (US Central)</SelectItem>
+                        <SelectItem value="eu">eu (Europe)</SelectItem>
+                        <SelectItem value="ap1">ap1 (Asia Pacific)</SelectItem>
+                        <SelectItem value="ap2">ap2 (Asia Pacific 2)</SelectItem>
+                        <SelectItem value="ap3">ap3 (Asia Pacific 3)</SelectItem>
+                        <SelectItem value="ap4">ap4 (Asia Pacific 4)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Webhook Endpoint</Label>
+                  <div className="p-4 bg-muted rounded-lg">
+                    <code className="text-sm break-all">
+                      {`${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/pusher`}
+                    </code>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Use this URL in your Pusher Dashboard webhook settings
+                  </p>
                 </div>
               </div>
 
