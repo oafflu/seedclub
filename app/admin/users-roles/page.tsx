@@ -57,6 +57,9 @@ import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { Textarea } from "@/components/ui/textarea"
+import { utils, write } from 'xlsx'
+import { exportToPDF } from './pdf-export'
 
 export default function RolesAndPermissionsPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -85,6 +88,10 @@ export default function RolesAndPermissionsPage() {
   const [isAddingUser, setIsAddingUser] = useState(false)
   const [newRole, setNewRole] = useState({ name: "", description: "" })
   const [newUser, setNewUser] = useState({ email: "", firstName: "", lastName: "", roleId: "" })
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
+  const [isEditingUser, setIsEditingUser] = useState(false)
+  const [editingRole, setEditingRole] = useState<AdminRole | null>(null)
+  const [isEditingRole, setIsEditingRole] = useState(false)
   const router = useRouter()
   const supabase = createClientComponentClient()
 
@@ -120,9 +127,14 @@ export default function RolesAndPermissionsPage() {
   )
 
   const filteredRoles = roles.filter(
-    (role) =>
-      role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (role.description && role.description.toLowerCase().includes(searchTerm.toLowerCase()))
+    (role): role is AdminRole => {
+      if (!role?.name) return false
+      const searchTermLower = searchTerm.toLowerCase()
+      return (
+        role.name.toLowerCase().includes(searchTermLower) ||
+        (role.description?.toLowerCase() || '').includes(searchTermLower)
+      )
+    }
   )
 
   const toggleUserSelection = (userId: string) => {
@@ -149,15 +161,47 @@ export default function RolesAndPermissionsPage() {
     }
   }
 
-  const handleUpdateUser = async (id: string, updates: Partial<AdminUser>) => {
+  const handleUpdateUser = async (userId: string, updates: Partial<AdminUser>) => {
     try {
-      await adminService.updateUser(id, updates)
-      await loadData()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not authenticated')
+
+      // Check if current user is super_admin
+      const { data: currentUser, error: currentUserError } = await supabase
+        .from('admin_users')
+        .select('role')
+        .eq('id', session.user.id)
+        .single()
+
+      if (currentUserError || !currentUser || currentUser.role !== 'super_admin') {
+        throw new Error('Only super admins can edit users')
+      }
+
+      // Update user in admin_users table
+      const { error: updateError } = await supabase
+        .from('admin_users')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId)
+
+      if (updateError) throw updateError
+
+      // If role is being updated, also update auth metadata
+      if (updates.role) {
+        const { error: authUpdateError } = await supabase.auth.admin.updateUserById(
+          userId,
+          { user_metadata: { role: updates.role } }
+        )
+        if (authUpdateError) throw authUpdateError
+      }
+
       toast.success('User updated successfully')
+      loadData()
     } catch (error: any) {
       console.error('Error updating user:', error)
-      const errorMessage = typeof error.message === 'string' ? error.message : 'Failed to update user'
-      toast.error(errorMessage)
+      toast.error(error.message || 'Failed to update user')
     }
   }
 
@@ -184,14 +228,38 @@ export default function RolesAndPermissionsPage() {
     }
   }
 
-  const handleUpdateRole = async (id: string, updates: Partial<AdminRole>) => {
+  const handleUpdateRole = async (roleId: string, updates: Partial<AdminRole>) => {
     try {
-      await adminService.updateRole(id, updates)
-      await loadData()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not authenticated')
+
+      // Check if current user is super_admin
+      const { data: currentUser, error: currentUserError } = await supabase
+        .from('admin_users')
+        .select('role')
+        .eq('id', session.user.id)
+        .single()
+
+      if (currentUserError || !currentUser || currentUser.role !== 'super_admin') {
+        throw new Error('Only super admins can edit roles')
+      }
+
+      // Update role
+      const { error: updateError } = await supabase
+        .from('admin_roles')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', roleId)
+
+      if (updateError) throw updateError
+
       toast.success('Role updated successfully')
-    } catch (error) {
+      loadData()
+    } catch (error: any) {
       console.error('Error updating role:', error)
-      toast.error('Failed to update role')
+      toast.error(error.message || 'Failed to update role')
     }
   }
 
@@ -218,7 +286,7 @@ export default function RolesAndPermissionsPage() {
   }
 
   // Format date
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | undefined | null) => {
     if (!dateString) return 'Never'
     const date = new Date(dateString)
     return date.toLocaleString()
@@ -295,16 +363,31 @@ export default function RolesAndPermissionsPage() {
 
     try {
       // First check if the current user has super_admin role
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw new Error('Authentication error: ' + sessionError.message)
       if (!session) throw new Error('Not authenticated')
 
-      const { data: currentUserRole, error: roleCheckError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', session.user.id)
+      // Get the current user's role from the admin_users table
+      const { data: adminData, error: adminError } = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('id', session.user.id)
         .single()
 
-      if (roleCheckError || !currentUserRole || currentUserRole.role !== 'super_admin') {
+      if (adminError) {
+        console.error('Admin role check error details:', {
+          error: adminError,
+          userId: session.user.id,
+          query: 'admin_users table query failed'
+        })
+        throw new Error(`Error checking admin role: ${adminError.message || 'Unknown error'}`)
+      }
+
+      if (!adminData) {
+        throw new Error('Admin user not found in database')
+      }
+
+      if (adminData.role !== 'super_admin') {
         throw new Error('Insufficient permissions. Only super admins can create admin users.')
       }
 
@@ -316,54 +399,69 @@ export default function RolesAndPermissionsPage() {
           data: {
             first_name: firstName,
             last_name: lastName,
+            role: role, // Store role in auth metadata
           },
         }
       })
 
-      if (signUpError) throw signUpError
+      if (signUpError) {
+        console.error('Signup error:', signUpError)
+        throw signUpError
+      }
 
       if (!user) {
         throw new Error('No user created')
       }
 
-      // Create user role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert([
-          {
-            user_id: user.id,
-            role: role // 'admin' or 'super_admin'
-          }
-        ])
-
-      if (roleError) throw roleError
-
-      // Create admin profile
-      const { error: profileError } = await supabase
-        .from('admins')
+      // Create admin profile without password
+      const { data: newAdmin, error: profileError } = await supabase
+        .from('admin_users')
         .insert([
           {
             id: user.id,
             first_name: firstName,
             last_name: lastName,
             email: email,
-            is_active: true
+            role: role,
+            encrypted_password: null,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           }
         ])
+        .select()
+        .single()
 
-      if (profileError) throw profileError
+      if (profileError) {
+        // If profile creation fails, clean up the auth user
+        await supabase.auth.admin.deleteUser(user.id)
+        
+        console.error('Profile creation error details:', {
+          error: profileError,
+          userId: user.id,
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            email: email,
+            role: role
+          }
+        })
+        throw new Error(`Failed to create admin profile: ${profileError.message || 'Unknown error'}`)
+      }
 
-      toast.success('Admin user created')
+      toast.success('Admin user created successfully')
 
       setEmail("")
       setPassword("")
       setRole("admin")
       setIsDialogOpen(false)
       
-      router.refresh()
+      loadData()
     } catch (error: any) {
       console.error('Admin creation error:', error)
-      const errorMessage = typeof error.message === 'string' ? error.message : "Failed to create admin user"
+      const errorMessage = typeof error.message === 'string' 
+        ? error.message 
+        : "Failed to create admin user"
       setError(errorMessage)
       toast.error(errorMessage)
     } finally {
@@ -436,6 +534,58 @@ export default function RolesAndPermissionsPage() {
       const errorMessage = typeof error.message === 'string' ? error.message : 'Failed to send password reset email'
       toast.error(errorMessage)
     }
+  }
+
+  const exportToExcel = (users: AdminUser[]) => {
+    const worksheet = utils.json_to_sheet(users.map(user => ({
+      'ID': user.id,
+      'First Name': user.first_name,
+      'Last Name': user.last_name,
+      'Email': user.email,
+      'Role': user.role,
+      'Status': user.is_active ? 'Active' : 'Inactive',
+      'Last Login': user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Never',
+      'Created At': new Date(user.created_at).toLocaleString()
+    })))
+
+    const workbook = utils.book_new()
+    utils.book_append_sheet(workbook, worksheet, 'Users')
+    
+    // Generate buffer
+    const excelBuffer = write(workbook, { bookType: 'xlsx', type: 'buffer' })
+    
+    // Create blob and download
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'admin_users.xlsx'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const exportToCSV = (users: AdminUser[]) => {
+    const csvContent = users.map(user => [
+      user.id,
+      user.first_name || '',
+      user.last_name || '',
+      user.email,
+      user.role,
+      user.is_active ? 'Active' : 'Inactive',
+      user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Never',
+      new Date(user.created_at).toLocaleString()
+    ].join(',')).join('\n')
+
+    const header = 'ID,First Name,Last Name,Email,Role,Status,Last Login,Created At\n'
+    const blob = new Blob([header + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'admin_users.csv'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   if (loading) {
@@ -546,8 +696,13 @@ export default function RolesAndPermissionsPage() {
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="super_admin">Super Admin</SelectItem>
+                      {roles
+                        .filter((role): role is AdminRole => Boolean(role?.name))
+                        .map((availableRole) => (
+                          <SelectItem key={availableRole.id} value={availableRole.name!}>
+                            {availableRole.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -624,10 +779,26 @@ export default function RolesAndPermissionsPage() {
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm">
-                    <Download className="mr-2 h-4 w-4" />
-                    Export
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Download className="mr-2 h-4 w-4" />
+                        Export
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[160px]">
+                      <DropdownMenuItem onClick={() => exportToExcel(filteredUsers)}>
+                        Export to Excel
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => exportToPDF(filteredUsers)}>
+                        Export to PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => exportToCSV(filteredUsers)}>
+                        Export to CSV
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 
@@ -637,7 +808,7 @@ export default function RolesAndPermissionsPage() {
                     <TableRow>
                       <TableHead className="w-[40px]">
                         <Checkbox
-                          checked={selectedUsers.length === filteredUsers.length && filteredUsers.length > 0}
+                          checked={Boolean(selectedUsers.length === filteredUsers.length && filteredUsers.length > 0)}
                           onCheckedChange={toggleAllUsers}
                         />
                       </TableHead>
@@ -762,14 +933,116 @@ export default function RolesAndPermissionsPage() {
                                   }}>
                                     {viewUser?.is_active ? 'Deactivate' : 'Activate'} User
                                   </Button>
-                                  <Button onClick={() => viewUser && handleInitiatePasswordReset(viewUser.id)}>Reset Password</Button>
+                                  <Button onClick={() => viewUser && handleInitiatePasswordReset(viewUser.id)}>
+                                    Reset Password
+                                  </Button>
                                 </DialogFooter>
                               </DialogContent>
                             </Dialog>
-                            <Button variant="ghost" size="icon">
-                              <Edit className="h-4 w-4" />
-                              <span className="sr-only">Edit</span>
-                            </Button>
+
+                            <Dialog open={isEditingUser} onOpenChange={setIsEditingUser}>
+                              <DialogTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <Edit className="h-4 w-4" />
+                                  <span className="sr-only">Edit</span>
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Edit User</DialogTitle>
+                                  <DialogDescription>
+                                    Update user details and permissions. Only super admins can edit users.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                {editingUser && (
+                                  <form onSubmit={async (e) => {
+                                    e.preventDefault()
+                                    const formData = new FormData(e.currentTarget)
+                                    await handleUpdateUser(editingUser.id, {
+                                      first_name: formData.get('firstName') as string,
+                                      last_name: formData.get('lastName') as string,
+                                      email: formData.get('email') as string,
+                                      role: formData.get('role') as string,
+                                      is_active: formData.get('isActive') === 'true'
+                                    })
+                                    setIsEditingUser(false)
+                                  }}>
+                                    <div className="grid gap-4 py-4">
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                          <Label htmlFor="firstName">First Name</Label>
+                                          <Input
+                                            id="firstName"
+                                            name="firstName"
+                                            defaultValue={editingUser.first_name || ''}
+                                            required
+                                          />
+                                        </div>
+                                        <div className="space-y-2">
+                                          <Label htmlFor="lastName">Last Name</Label>
+                                          <Input
+                                            id="lastName"
+                                            name="lastName"
+                                            defaultValue={editingUser.last_name || ''}
+                                            required
+                                          />
+                                        </div>
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label htmlFor="email">Email</Label>
+                                        <Input
+                                          id="email"
+                                          name="email"
+                                          type="email"
+                                          defaultValue={editingUser.email}
+                                          required
+                                        />
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label htmlFor="role">Role</Label>
+                                        <Select name="role" defaultValue={editingUser.role}>
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Select role" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {roles.map((role) => (
+                                              <SelectItem key={role.id} value={role.name}>
+                                                {role.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <Label htmlFor="isActive">Active Status</Label>
+                                        <Switch
+                                          id="isActive"
+                                          name="isActive"
+                                          defaultChecked={editingUser.is_active}
+                                          onCheckedChange={(checked) => {
+                                            const form = document.querySelector('form')
+                                            if (form) {
+                                              const input = form.querySelector('input[name="isActive"]')
+                                              if (input) {
+                                                (input as HTMLInputElement).value = checked.toString()
+                                              }
+                                            }
+                                          }}
+                                        />
+                                        <input type="hidden" name="isActive" value={editingUser.is_active.toString()} />
+                                      </div>
+                                    </div>
+                                    <DialogFooter>
+                                      <Button type="button" variant="outline" onClick={() => setIsEditingUser(false)}>
+                                        Cancel
+                                      </Button>
+                                      <Button type="submit">Save Changes</Button>
+                                    </DialogFooter>
+                                  </form>
+                                )}
+                              </DialogContent>
+                            </Dialog>
+
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon">
@@ -816,6 +1089,39 @@ export default function RolesAndPermissionsPage() {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="capitalize">{role.name}</CardTitle>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => {
+                          const newName = prompt('Enter new role name:', role.name)
+                          if (newName && newName !== role.name) {
+                            handleUpdateRole(role.id, { name: newName })
+                          }
+                        }}>
+                          <Edit className="mr-2 h-4 w-4" /> Edit Name
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          const newDesc = prompt('Enter new description:', role.description)
+                          if (newDesc !== null && newDesc !== role.description) {
+                            handleUpdateRole(role.id, { description: newDesc })
+                          }
+                        }}>
+                          <Edit className="mr-2 h-4 w-4" /> Edit Description
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-destructive" onClick={() => {
+                          if (confirm('Are you sure you want to delete this role? This action cannot be undone.')) {
+                            handleDeleteRole(role.id)
+                          }
+                        }}>
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete Role
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                   <CardDescription>{role.description}</CardDescription>
                 </CardHeader>
@@ -847,7 +1153,7 @@ export default function RolesAndPermissionsPage() {
                 <CardFooter className="flex justify-end gap-2 pt-0">
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button variant="outline" size="sm" onClick={() => setViewRole(role)}>
+                      <Button variant="outline" size="sm">
                         <Eye className="mr-2 h-4 w-4" /> View
                       </Button>
                     </DialogTrigger>
@@ -856,64 +1162,129 @@ export default function RolesAndPermissionsPage() {
                         <DialogTitle>Role Permissions</DialogTitle>
                         <DialogDescription>Detailed permissions for this role.</DialogDescription>
                       </DialogHeader>
-                      {viewRole && (
-                        <div className="grid gap-6 py-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="text-lg font-semibold capitalize">{viewRole.name}</h3>
-                              <p className="text-sm text-muted-foreground">{viewRole.description}</p>
-                            </div>
-                          </div>
-
-                          <div className="space-y-6">
-                            {['dashboard', 'customers', 'transactions', 'reports', 'settings', 'users'].map(resource => (
-                              <div key={resource} className="space-y-3">
-                                <h4 className="text-sm font-medium capitalize">{resource} Permissions</h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                  {permissions
-                                    .filter(p => p.resource === resource)
-                                    .map(permission => (
-                                      <div key={permission.id} className="flex items-center justify-between space-x-2">
-                                        <Label htmlFor={`${resource}-${permission.action}`}>
-                                          {permission.description || permission.name}
-                                        </Label>
-                                        <Switch
-                                          id={`${resource}-${permission.action}`}
-                                          checked={true}
-                                          onCheckedChange={(checked) => {
-                                            // TODO: Implement permission toggle
-                                            toast.info('Permission update coming soon')
-                                          }}
-                                        />
-                                      </div>
-                                    ))
-                                  }
-                                </div>
-                                <Separator />
-                              </div>
-                            ))}
+                      <div className="grid gap-6 py-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-lg font-semibold capitalize">{role.name}</h3>
+                            <p className="text-sm text-muted-foreground">{role.description}</p>
                           </div>
                         </div>
-                      )}
+
+                        <div className="space-y-6">
+                          {['dashboard', 'customers', 'transactions', 'reports', 'settings', 'users'].map(resource => (
+                            <div key={resource} className="space-y-3">
+                              <h4 className="text-sm font-medium capitalize">{resource} Permissions</h4>
+                              <div className="grid grid-cols-2 gap-4">
+                                {permissions
+                                  .filter(p => p.resource === resource)
+                                  .map(permission => (
+                                    <div key={permission.id} className="flex items-center justify-between space-x-2">
+                                      <Label htmlFor={`${resource}-${permission.action}`}>
+                                        {permission.description || permission.name}
+                                      </Label>
+                                      <Switch
+                                        id={`${resource}-${permission.action}`}
+                                        checked={true}
+                                        onCheckedChange={(checked) => {
+                                          // TODO: Implement permission toggle
+                                          toast.info('Permission update coming soon')
+                                        }}
+                                      />
+                                    </div>
+                                  ))}
+                              </div>
+                              <Separator />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                       <DialogFooter>
                         <Button variant="outline" onClick={() => {
-                          if (!viewRole) return
                           setCloneRoleData({
-                            roleId: viewRole.id,
-                            name: `${viewRole.name} (Copy)`,
-                            description: viewRole.description || ''
+                            roleId: role.id,
+                            name: `${role.name} (Copy)`,
+                            description: role.description || ''
                           })
                         }}>Clone Role</Button>
-                        <Button onClick={() => {
-                          // TODO: Implement role editing
-                          toast.info('Role editing coming soon')
-                        }}>Edit Role</Button>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
-                  <Button size="sm">
-                    <Edit className="mr-2 h-4 w-4" /> Edit
-                  </Button>
+
+                  <Dialog open={isEditingRole} onOpenChange={setIsEditingRole}>
+                    <DialogTrigger asChild>
+                      <Button size="sm">
+                        <Edit className="mr-2 h-4 w-4" /> Edit
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Edit Role</DialogTitle>
+                        <DialogDescription>
+                          Update role details and permissions. Only super admins can edit roles.
+                        </DialogDescription>
+                      </DialogHeader>
+                      {editingRole && (
+                        <form onSubmit={async (e) => {
+                          e.preventDefault()
+                          const formData = new FormData(e.currentTarget)
+                          await handleUpdateRole(editingRole.id, {
+                            name: formData.get('name') as string,
+                            description: formData.get('description') as string
+                          })
+                          setIsEditingRole(false)
+                        }}>
+                          <div className="grid gap-4 py-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="name">Role Name</Label>
+                              <Input
+                                id="name"
+                                name="name"
+                                defaultValue={editingRole.name}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="description">Description</Label>
+                              <Textarea
+                                id="description"
+                                name="description"
+                                defaultValue={editingRole.description || ''}
+                                rows={3}
+                              />
+                            </div>
+                            <div className="space-y-4">
+                              <Label>Permissions</Label>
+                              <div className="grid grid-cols-2 gap-4">
+                                {permissions
+                                  .filter(p => p.resource === editingRole.name)
+                                  .map(permission => (
+                                    <div key={permission.id} className="flex items-center space-x-2">
+                                      <Checkbox
+                                        id={permission.id}
+                                        defaultChecked={true}
+                                        onCheckedChange={(checked) => {
+                                          // TODO: Implement permission toggle
+                                          toast.info('Permission update coming soon')
+                                        }}
+                                      />
+                                      <Label htmlFor={permission.id}>
+                                        {permission.description || permission.name}
+                                      </Label>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          </div>
+                          <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setIsEditingRole(false)}>
+                              Cancel
+                            </Button>
+                            <Button type="submit">Save Changes</Button>
+                          </DialogFooter>
+                        </form>
+                      )}
+                    </DialogContent>
+                  </Dialog>
                 </CardFooter>
               </Card>
             ))}
