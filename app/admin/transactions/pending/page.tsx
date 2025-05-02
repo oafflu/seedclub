@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Search,
   Filter,
@@ -47,126 +47,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/use-toast"
 
-// Mock data for pending transactions
-const pendingTransactions = [
-  {
-    id: "TX-008",
-    customerId: "CUST-005",
-    customerName: "Robert Wilson",
-    type: "withdrawal",
-    amount: 2000,
-    date: "2024-01-18",
-    submittedDate: "2024-01-18T09:23:45",
-    description: "Partial withdrawal",
-    method: "Bank Transfer",
-    status: "pending",
-    jarId: "JAR-005",
-    accountNumber: "****4567",
-    bankName: "First National Bank",
-    routingNumber: "****1234",
-    reason: "Emergency funds needed",
-    documents: ["withdrawal_request.pdf"],
-    history: [
-      { action: "Submitted", timestamp: "2024-01-18T09:23:45", by: "Robert Wilson" },
-      { action: "Documentation verified", timestamp: "2024-01-18T10:15:22", by: "System" },
-      { action: "Pending approval", timestamp: "2024-01-18T10:15:30", by: "System" },
-    ],
-  },
-  {
-    id: "TX-012",
-    customerId: "CUST-008",
-    customerName: "Lisa Martinez",
-    type: "withdrawal",
-    amount: 5000,
-    date: "2024-01-20",
-    submittedDate: "2024-01-20T14:08:12",
-    description: "Full withdrawal",
-    method: "Bank Transfer",
-    status: "pending",
-    jarId: "JAR-007",
-    accountNumber: "****7890",
-    bankName: "Chase Bank",
-    routingNumber: "****5678",
-    reason: "Moving to new investment opportunity",
-    documents: ["withdrawal_form.pdf", "id_verification.jpg"],
-    history: [
-      { action: "Submitted", timestamp: "2024-01-20T14:08:12", by: "Lisa Martinez" },
-      { action: "Documentation verified", timestamp: "2024-01-20T15:30:05", by: "Admin (Jane Smith)" },
-      { action: "Pending approval", timestamp: "2024-01-20T15:31:45", by: "System" },
-    ],
-  },
-  {
-    id: "TX-015",
-    customerId: "CUST-010",
-    customerName: "Daniel Rodriguez",
-    type: "deposit",
-    amount: 15000,
-    date: "2024-01-22",
-    submittedDate: "2024-01-22T11:45:33",
-    description: "Additional deposit",
-    method: "Wire Transfer",
-    status: "pending",
-    jarId: "JAR-010",
-    accountNumber: "N/A",
-    bankName: "Bank of America",
-    routingNumber: "N/A",
-    reason: "Investing additional funds",
-    documents: ["proof_of_funds.pdf"],
-    history: [
-      { action: "Submitted", timestamp: "2024-01-22T11:45:33", by: "Daniel Rodriguez" },
-      { action: "Pending verification", timestamp: "2024-01-22T11:45:40", by: "System" },
-    ],
-  },
-  {
-    id: "TX-018",
-    customerId: "CUST-012",
-    customerName: "Jennifer Taylor",
-    type: "deposit",
-    amount: 8000,
-    date: "2024-01-23",
-    submittedDate: "2024-01-23T16:20:18",
-    description: "Initial deposit",
-    method: "ACH Transfer",
-    status: "pending",
-    jarId: "JAR-012",
-    accountNumber: "N/A",
-    bankName: "Wells Fargo",
-    routingNumber: "N/A",
-    reason: "Starting new investment",
-    documents: ["new_customer_form.pdf"],
-    history: [
-      { action: "Submitted", timestamp: "2024-01-23T16:20:18", by: "Jennifer Taylor" },
-      { action: "Documentation verified", timestamp: "2024-01-23T17:05:11", by: "Admin (John Doe)" },
-      { action: "Pending funds verification", timestamp: "2024-01-23T17:06:30", by: "System" },
-    ],
-  },
-  {
-    id: "TX-020",
-    customerId: "CUST-015",
-    customerName: "James Anderson",
-    type: "withdrawal",
-    amount: 3500,
-    date: "2024-01-24",
-    submittedDate: "2024-01-24T10:12:55",
-    description: "Partial withdrawal",
-    method: "Bank Transfer",
-    status: "pending",
-    jarId: "JAR-015",
-    accountNumber: "****2345",
-    bankName: "TD Bank",
-    routingNumber: "****8901",
-    reason: "Personal expense",
-    documents: ["withdrawal_request.pdf", "authorization_form.pdf"],
-    history: [
-      { action: "Submitted", timestamp: "2024-01-24T10:12:55", by: "James Anderson" },
-      { action: "Documentation verified", timestamp: "2024-01-24T11:30:22", by: "Admin (Sarah Jones)" },
-      { action: "Pending approval", timestamp: "2024-01-24T11:32:10", by: "System" },
-    ],
-  },
-]
-
 export default function PendingTransactionsPage() {
   const router = useRouter()
+  const [pendingTransactions, setPendingTransactions] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([])
   const [viewTransaction, setViewTransaction] = useState<any>(null)
@@ -177,12 +61,38 @@ export default function PendingTransactionsPage() {
   const [rejectionReason, setRejectionReason] = useState("")
   const [actionTransaction, setActionTransaction] = useState<any>(null)
 
+  useEffect(() => {
+    async function fetchPendingTransactions() {
+      try {
+        const response = await fetch('/api/admin/transactions/pending')
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch pending transactions')
+        }
+
+        setPendingTransactions(data.transactions || [])
+      } catch (error) {
+        console.error('Error fetching pending transactions:', error)
+        toast({
+          title: "Error fetching transactions",
+          description: "There was a problem loading the pending transactions.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchPendingTransactions()
+  }, [])
+
   const filteredTransactions = pendingTransactions
     .filter(
       (tx) =>
-        tx.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tx.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tx.description.toLowerCase().includes(searchTerm.toLowerCase()),
+        tx.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        tx.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        tx.description?.toLowerCase().includes(searchTerm.toLowerCase()),
     )
     .filter((tx) => {
       if (activeTab === "all") return true
@@ -213,49 +123,260 @@ export default function PendingTransactionsPage() {
     setShowRejectionDialog(true)
   }
 
-  const confirmApproval = () => {
-    // Here you would implement the actual approval logic, API call, etc.
-    toast({
-      title: "Transaction Approved",
-      description: `Transaction ${actionTransaction.id} has been successfully approved.`,
-    })
-    setShowApprovalDialog(false)
-    setApprovalNotes("")
-    setActionTransaction(null)
+  const confirmApproval = async () => {
+    try {
+      const response = await fetch('/api/admin/transactions/pending', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: actionTransaction.id,
+          action: 'approve',
+          notes: approvalNotes,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to approve transaction')
+      }
+
+      // Update local state
+      setPendingTransactions(prev => prev.filter(tx => tx.id !== actionTransaction.id))
+
+      toast({
+        title: "Transaction Approved",
+        description: `Transaction ${actionTransaction.id} has been successfully approved.`,
+      })
+
+      setShowApprovalDialog(false)
+      setApprovalNotes("")
+      setActionTransaction(null)
+    } catch (error) {
+      console.error('Error approving transaction:', error)
+      toast({
+        title: "Error approving transaction",
+        description: "There was a problem approving the transaction.",
+        variant: "destructive",
+      })
+    }
   }
 
-  const confirmRejection = () => {
-    // Here you would implement the actual rejection logic, API call, etc.
-    toast({
-      title: "Transaction Rejected",
-      description: `Transaction ${actionTransaction.id} has been rejected.`,
-    })
-    setShowRejectionDialog(false)
-    setRejectionReason("")
-    setActionTransaction(null)
+  const confirmRejection = async () => {
+    try {
+      const response = await fetch('/api/admin/transactions/pending', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: actionTransaction.id,
+          action: 'reject',
+          reason: rejectionReason,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to reject transaction')
+      }
+
+      // Update local state
+      setPendingTransactions(prev => prev.filter(tx => tx.id !== actionTransaction.id))
+
+      toast({
+        title: "Transaction Rejected",
+        description: `Transaction ${actionTransaction.id} has been rejected.`,
+      })
+
+      setShowRejectionDialog(false)
+      setRejectionReason("")
+      setActionTransaction(null)
+    } catch (error) {
+      console.error('Error rejecting transaction:', error)
+      toast({
+        title: "Error rejecting transaction",
+        description: "There was a problem rejecting the transaction.",
+        variant: "destructive",
+      })
+    }
   }
 
-  const bulkApprove = () => {
-    // Here you would implement the bulk approval logic
-    toast({
-      title: "Transactions Approved",
-      description: `${selectedTransactions.length} transactions have been approved.`,
-    })
-    setSelectedTransactions([])
+  const bulkApprove = async () => {
+    try {
+      const promises = selectedTransactions.map(id => {
+        return fetch('/api/admin/transactions/pending', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id,
+            action: 'approve',
+            notes: 'Bulk approval',
+          }),
+        })
+      })
+
+      await Promise.all(promises)
+
+      // Update local state
+      setPendingTransactions(prev => prev.filter(tx => !selectedTransactions.includes(tx.id)))
+
+      toast({
+        title: "Transactions Approved",
+        description: `${selectedTransactions.length} transactions have been approved.`,
+      })
+
+      setSelectedTransactions([])
+    } catch (error) {
+      console.error('Error bulk approving transactions:', error)
+      toast({
+        title: "Error approving transactions",
+        description: "There was a problem with the bulk approval.",
+        variant: "destructive",
+      })
+    }
   }
 
-  const bulkReject = () => {
-    // Here you would implement the bulk rejection logic
-    toast({
-      title: "Transactions Rejected",
-      description: `${selectedTransactions.length} transactions have been rejected.`,
-    })
-    setSelectedTransactions([])
+  const bulkReject = async () => {
+    try {
+      const promises = selectedTransactions.map(id => {
+        return fetch('/api/admin/transactions/pending', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id,
+            action: 'reject',
+            reason: 'Bulk rejection',
+          }),
+        })
+      })
+
+      await Promise.all(promises)
+
+      // Update local state
+      setPendingTransactions(prev => prev.filter(tx => !selectedTransactions.includes(tx.id)))
+
+      toast({
+        title: "Transactions Rejected",
+        description: `${selectedTransactions.length} transactions have been rejected.`,
+      })
+
+      setSelectedTransactions([])
+    } catch (error) {
+      console.error('Error bulk rejecting transactions:', error)
+      toast({
+        title: "Error rejecting transactions",
+        description: "There was a problem with the bulk rejection.",
+        variant: "destructive",
+      })
+    }
   }
 
   const formatDateTime = (dateTimeStr: string) => {
     const date = new Date(dateTimeStr)
     return date.toLocaleString()
+  }
+
+  // Add export function
+  const handleExport = async (format: 'csv' | 'excel' | 'pdf') => {
+    try {
+      // Prepare data for export
+      const data = pendingTransactions.map((tx) => ({
+        'Transaction ID': tx.id,
+        'Customer Name': tx.customer?.name || 'N/A',
+        'Customer ID': tx.customer_id,
+        'Type': tx.type,
+        'Amount': tx.amount,
+        'Date Submitted': new Date(tx.created_at).toLocaleDateString(),
+        'Description': tx.description,
+        'Method': tx.method,
+        'Status': tx.status,
+        'Jar': tx.jar?.name || 'N/A'
+      }))
+
+      let blob: Blob
+      let filename: string
+
+      switch (format) {
+        case 'csv':
+          // Convert data to CSV
+          const csvContent = [
+            Object.keys(data[0]).join(','),
+            ...data.map((row) => Object.values(row).join(','))
+          ].join('\n')
+          blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+          filename = `pending_transactions_${format}_${new Date().toISOString().split('T')[0]}.csv`
+          break
+
+        case 'excel':
+          // Use xlsx library for Excel export
+          const XLSX = await import('xlsx')
+          const ws = XLSX.utils.json_to_sheet(data)
+          const wb = XLSX.utils.book_new()
+          XLSX.utils.book_append_sheet(wb, ws, 'Pending Transactions')
+          const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+          blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+          filename = `pending_transactions_${format}_${new Date().toISOString().split('T')[0]}.xlsx`
+          break
+
+        case 'pdf':
+          // Use jspdf and jspdf-autotable for PDF export
+          const { jsPDF } = await import('jspdf')
+          const { default: autoTable } = await import('jspdf-autotable')
+          
+          const doc = new jsPDF()
+          autoTable(doc, {
+            head: [Object.keys(data[0])],
+            body: data.map(row => Object.values(row)),
+          })
+          
+          blob = doc.output('blob')
+          filename = `pending_transactions_${format}_${new Date().toISOString().split('T')[0]}.pdf`
+          break
+
+        default:
+          throw new Error('Unsupported export format')
+      }
+
+      // Create download link and trigger download
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      toast({
+        title: "Export successful",
+        description: `Pending transactions have been exported as ${format.toUpperCase()}`,
+      })
+    } catch (error) {
+      console.error('Error exporting data:', error)
+      toast({
+        title: "Export failed",
+        description: "There was a problem exporting the data",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Add loading state
+  if (isLoading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading pending transactions...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -352,10 +473,28 @@ export default function PendingTransactionsPage() {
                 </TabsList>
               </Tabs>
 
-              <Button variant="outline" size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Download className="mr-2 h-4 w-4" />
+                    Export
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Choose format</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleExport('csv')}>
+                    Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport('excel')}>
+                    Export as Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                    Export as PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   Search,
@@ -43,144 +43,49 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-
-// Mock data for transactions
-const transactions = [
-  {
-    id: "TX-001",
-    customerId: "CUST-001",
-    customerName: "John Smith",
-    type: "deposit",
-    amount: 5000,
-    date: "2023-12-15",
-    description: "Initial deposit",
-    method: "Bank Transfer",
-    status: "completed",
-    jarId: "JAR-001",
-  },
-  {
-    id: "TX-002",
-    customerId: "CUST-002",
-    customerName: "Sarah Johnson",
-    type: "deposit",
-    amount: 10000,
-    date: "2023-12-10",
-    description: "Initial deposit",
-    method: "Credit Card",
-    status: "completed",
-    jarId: "JAR-002",
-  },
-  {
-    id: "TX-003",
-    customerId: "CUST-003",
-    customerName: "Michael Chen",
-    type: "deposit",
-    amount: 15000,
-    date: "2023-12-01",
-    description: "Initial deposit",
-    method: "Bank Transfer",
-    status: "completed",
-    jarId: "JAR-003",
-  },
-  {
-    id: "TX-004",
-    customerId: "CUST-001",
-    customerName: "John Smith",
-    type: "interest",
-    amount: 50,
-    date: "2024-01-15",
-    description: "Monthly interest",
-    method: "System",
-    status: "completed",
-    jarId: "JAR-001",
-  },
-  {
-    id: "TX-005",
-    customerId: "CUST-002",
-    customerName: "Sarah Johnson",
-    type: "interest",
-    amount: 116.67,
-    date: "2024-01-10",
-    description: "Monthly interest",
-    method: "System",
-    status: "completed",
-    jarId: "JAR-002",
-  },
-  {
-    id: "TX-006",
-    customerId: "CUST-003",
-    customerName: "Michael Chen",
-    type: "interest",
-    amount: 200,
-    date: "2024-01-01",
-    description: "Monthly interest",
-    method: "System",
-    status: "completed",
-    jarId: "JAR-003",
-  },
-  {
-    id: "TX-007",
-    customerId: "CUST-004",
-    customerName: "Emily Davis",
-    type: "deposit",
-    amount: 25000,
-    date: "2023-11-15",
-    description: "Initial deposit",
-    method: "Bank Transfer",
-    status: "completed",
-    jarId: "JAR-004",
-  },
-  {
-    id: "TX-008",
-    customerId: "CUST-005",
-    customerName: "Robert Wilson",
-    type: "withdrawal",
-    amount: 2000,
-    date: "2024-01-18",
-    description: "Partial withdrawal",
-    method: "Bank Transfer",
-    status: "pending",
-    jarId: "JAR-005",
-  },
-  {
-    id: "TX-009",
-    customerId: "CUST-007",
-    customerName: "David Brown",
-    type: "deposit",
-    amount: 3000,
-    date: "2023-12-01",
-    description: "Initial deposit",
-    method: "Credit Card",
-    status: "completed",
-    jarId: "JAR-006",
-  },
-  {
-    id: "TX-010",
-    customerId: "CUST-008",
-    customerName: "Lisa Martinez",
-    type: "deposit",
-    amount: 7500,
-    date: "2023-11-20",
-    description: "Initial deposit",
-    method: "Bank Transfer",
-    status: "completed",
-    jarId: "JAR-007",
-  },
-]
+import { toast } from "@/components/ui/use-toast"
 
 export default function TransactionsPage() {
+  const [transactions, setTransactions] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([])
   const [viewTransaction, setViewTransaction] = useState<any>(null)
   const [activeTab, setActiveTab] = useState("all")
   const router = useRouter()
 
+  useEffect(() => {
+    async function fetchTransactions() {
+      try {
+        const response = await fetch('/api/admin/transactions')
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch transactions')
+        }
+
+        setTransactions(data.transactions || [])
+      } catch (error) {
+        console.error('Error fetching transactions:', error)
+        toast({
+          title: "Error fetching transactions",
+          description: "There was a problem loading the transactions.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchTransactions()
+  }, [])
+
   const filteredTransactions = transactions
     .filter(
       (tx) =>
-        tx.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tx.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tx.description.toLowerCase().includes(searchTerm.toLowerCase()),
+        tx.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        tx.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        tx.description?.toLowerCase().includes(searchTerm.toLowerCase()),
     )
     .filter((tx) => {
       if (activeTab === "all") return true
@@ -206,22 +111,114 @@ export default function TransactionsPage() {
   // Calculate totals
   const totalDeposits = transactions
     .filter((tx) => tx.type === "deposit" && tx.status === "completed")
-    .reduce((sum, tx) => sum + tx.amount, 0)
+    .reduce((sum, tx) => sum + (tx.amount || 0), 0)
 
   const totalWithdrawals = transactions
     .filter((tx) => tx.type === "withdrawal" && tx.status === "completed")
-    .reduce((sum, tx) => sum + tx.amount, 0)
+    .reduce((sum, tx) => sum + (tx.amount || 0), 0)
 
   const totalInterest = transactions
     .filter((tx) => tx.type === "interest" && tx.status === "completed")
-    .reduce((sum, tx) => sum + tx.amount, 0)
+    .reduce((sum, tx) => sum + (tx.amount || 0), 0)
 
   const pendingTransactions = transactions
     .filter((tx) => tx.status === "pending")
-    .reduce((sum, tx) => sum + tx.amount, 0)
+    .reduce((sum, tx) => sum + (tx.amount || 0), 0)
 
-  // Add the following constant to count pending transactions
-  const pendingTransactionsCount = transactions.filter((tx) => tx.status === "pending").length
+  // Add export function
+  const handleExport = async (format: 'csv' | 'excel' | 'pdf') => {
+    try {
+      // Prepare data for export
+      const data = transactions.map((tx) => ({
+        'Transaction ID': tx.id,
+        'Customer Name': tx.customer?.name || 'N/A',
+        'Customer ID': tx.customer_id,
+        'Type': tx.type,
+        'Amount': tx.amount,
+        'Date': new Date(tx.created_at).toLocaleDateString(),
+        'Description': tx.description,
+        'Method': tx.method,
+        'Status': tx.status,
+        'Jar': tx.jar?.name || 'N/A'
+      }))
+
+      let blob: Blob
+      let filename: string
+
+      switch (format) {
+        case 'csv':
+          // Convert data to CSV
+          const csvContent = [
+            Object.keys(data[0]).join(','),
+            ...data.map((row) => Object.values(row).join(','))
+          ].join('\n')
+          blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+          filename = `transactions_export_${format}_${new Date().toISOString().split('T')[0]}.csv`
+          break
+
+        case 'excel':
+          // Use xlsx library for Excel export
+          const XLSX = await import('xlsx')
+          const ws = XLSX.utils.json_to_sheet(data)
+          const wb = XLSX.utils.book_new()
+          XLSX.utils.book_append_sheet(wb, ws, 'Transactions')
+          const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+          blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+          filename = `transactions_export_${format}_${new Date().toISOString().split('T')[0]}.xlsx`
+          break
+
+        case 'pdf':
+          // Use jspdf and jspdf-autotable for PDF export
+          const { jsPDF } = await import('jspdf')
+          const { default: autoTable } = await import('jspdf-autotable')
+          
+          const doc = new jsPDF()
+          autoTable(doc, {
+            head: [Object.keys(data[0])],
+            body: data.map(row => Object.values(row)),
+          })
+          
+          blob = doc.output('blob')
+          filename = `transactions_export_${format}_${new Date().toISOString().split('T')[0]}.pdf`
+          break
+
+        default:
+          throw new Error('Unsupported export format')
+      }
+
+      // Create download link and trigger download
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      toast({
+        title: "Export successful",
+        description: `Transactions have been exported as ${format.toUpperCase()}`,
+      })
+    } catch (error) {
+      console.error('Error exporting data:', error)
+      toast({
+        title: "Export failed",
+        description: "There was a problem exporting the data",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Add loading state
+  if (isLoading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading transactions...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -235,7 +232,7 @@ export default function TransactionsPage() {
           >
             <Clock className="mr-2 h-4 w-4 text-amber-500" /> Pending Transactions
             <Badge variant="outline" className="ml-2 bg-amber-100 text-amber-700 border-amber-200">
-              {pendingTransactions.length}
+              {transactions.filter(tx => tx.status === "pending").length}
             </Badge>
           </Button>
           <Button>
@@ -359,10 +356,28 @@ export default function TransactionsPage() {
                 </TabsList>
               </Tabs>
 
-              <Button variant="outline" size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Download className="mr-2 h-4 w-4" />
+                    Export
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Choose format</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleExport('csv')}>
+                    Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport('excel')}>
+                    Export as Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                    Export as PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
@@ -390,177 +405,185 @@ export default function TransactionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTransactions.map((tx) => (
-                  <TableRow key={tx.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedTransactions.includes(tx.id)}
-                        onCheckedChange={() => toggleTransactionSelection(tx.id)}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">{tx.id}</TableCell>
-                    <TableCell>{tx.customerName}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <div
-                          className={`mr-2 rounded-full p-1 ${
-                            tx.type === "deposit"
-                              ? "bg-green-100 text-green-600"
-                              : tx.type === "withdrawal"
-                                ? "bg-red-100 text-red-600"
-                                : "bg-amber-100 text-amber-600"
-                          }`}
-                        >
-                          {tx.type === "deposit" && <ArrowUpRight className="h-3 w-3" />}
-                          {tx.type === "withdrawal" && <ArrowDownRight className="h-3 w-3" />}
-                          {tx.type === "interest" && <Clock className="h-3 w-3" />}
-                        </div>
-                        {tx.type}
-                      </div>
-                    </TableCell>
-                    <TableCell>{tx.description}</TableCell>
-                    <TableCell>{tx.date}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        {tx.method === "Bank Transfer" && <BanknoteIcon className="mr-1 h-3 w-3" />}
-                        {tx.method === "Credit Card" && <CreditCard className="mr-1 h-3 w-3" />}
-                        {tx.method === "System" && <Clock className="mr-1 h-3 w-3" />}
-                        {tx.method}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={tx.status === "completed" ? "default" : "outline"}>{tx.status}</Badge>
-                    </TableCell>
-                    <TableCell
-                      className={`text-right font-medium ${
-                        tx.type === "deposit" || tx.type === "interest"
-                          ? "text-green-600"
-                          : tx.type === "withdrawal"
-                            ? "text-red-600"
-                            : ""
-                      }`}
-                    >
-                      {tx.type === "deposit" || tx.type === "interest" ? "+" : "-"}${tx.amount.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-2">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => setViewTransaction(tx)}>
-                              <Eye className="h-4 w-4" />
-                              <span className="sr-only">View</span>
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="sm:max-w-[600px]">
-                            <DialogHeader>
-                              <DialogTitle>Transaction Details</DialogTitle>
-                              <DialogDescription>Detailed information about the transaction.</DialogDescription>
-                            </DialogHeader>
-                            {viewTransaction && (
-                              <div className="grid gap-4 py-4">
-                                <div className="flex items-center gap-4">
-                                  <div
-                                    className={`rounded-full p-3 ${
-                                      viewTransaction.type === "deposit"
-                                        ? "bg-green-100 text-green-600"
-                                        : viewTransaction.type === "withdrawal"
-                                          ? "bg-red-100 text-red-600"
-                                          : "bg-amber-100 text-amber-600"
-                                    }`}
-                                  >
-                                    {viewTransaction.type === "deposit" && <ArrowUpRight className="h-6 w-6" />}
-                                    {viewTransaction.type === "withdrawal" && <ArrowDownRight className="h-6 w-6" />}
-                                    {viewTransaction.type === "interest" && <Clock className="h-6 w-6" />}
-                                  </div>
-                                  <div>
-                                    <h3 className="text-lg font-semibold">{viewTransaction.description}</h3>
-                                    <p className="text-sm text-muted-foreground">{viewTransaction.type} transaction</p>
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <Label className="text-sm text-muted-foreground">Transaction ID</Label>
-                                    <p>{viewTransaction.id}</p>
-                                  </div>
-                                  <div>
-                                    <Label className="text-sm text-muted-foreground">Customer</Label>
-                                    <p>
-                                      {viewTransaction.customerName} ({viewTransaction.customerId})
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <Label className="text-sm text-muted-foreground">Jar ID</Label>
-                                    <p>{viewTransaction.jarId}</p>
-                                  </div>
-                                  <div>
-                                    <Label className="text-sm text-muted-foreground">Date</Label>
-                                    <p>{viewTransaction.date}</p>
-                                  </div>
-                                  <div>
-                                    <Label className="text-sm text-muted-foreground">Method</Label>
-                                    <p>{viewTransaction.method}</p>
-                                  </div>
-                                  <div>
-                                    <Label className="text-sm text-muted-foreground">Status</Label>
-                                    <p>
-                                      <Badge variant={viewTransaction.status === "completed" ? "default" : "outline"}>
-                                        {viewTransaction.status}
-                                      </Badge>
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <Label className="text-sm text-muted-foreground">Amount</Label>
-                                    <p
-                                      className={`font-medium ${
-                                        viewTransaction.type === "deposit" || viewTransaction.type === "interest"
-                                          ? "text-green-600"
-                                          : viewTransaction.type === "withdrawal"
-                                            ? "text-red-600"
-                                            : ""
-                                      }`}
-                                    >
-                                      {viewTransaction.type === "deposit" || viewTransaction.type === "interest"
-                                        ? "+"
-                                        : "-"}
-                                      ${viewTransaction.amount.toLocaleString()}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            <DialogFooter>
-                              <Button variant="outline">Print Receipt</Button>
-                              {viewTransaction?.status === "pending" && <Button>Approve Transaction</Button>}
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">More</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="mr-2 h-4 w-4" /> View Details
-                            </DropdownMenuItem>
-                            {tx.status === "pending" && (
-                              <>
-                                <DropdownMenuItem>
-                                  <ArrowUpRight className="mr-2 h-4 w-4 text-green-500" /> Approve
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive">
-                                  <ArrowDownRight className="mr-2 h-4 w-4" /> Reject
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                {filteredTransactions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="h-24 text-center">
+                      No transactions found.
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filteredTransactions.map((tx) => (
+                    <TableRow key={tx.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedTransactions.includes(tx.id)}
+                          onCheckedChange={() => toggleTransactionSelection(tx.id)}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">{tx.id}</TableCell>
+                      <TableCell>{tx.customer?.name || 'N/A'}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <div
+                            className={`mr-2 rounded-full p-1 ${
+                              tx.type === "deposit"
+                                ? "bg-green-100 text-green-600"
+                                : tx.type === "withdrawal"
+                                  ? "bg-red-100 text-red-600"
+                                  : "bg-amber-100 text-amber-600"
+                            }`}
+                          >
+                            {tx.type === "deposit" && <ArrowUpRight className="h-3 w-3" />}
+                            {tx.type === "withdrawal" && <ArrowDownRight className="h-3 w-3" />}
+                            {tx.type === "interest" && <Clock className="h-3 w-3" />}
+                          </div>
+                          {tx.type}
+                        </div>
+                      </TableCell>
+                      <TableCell>{tx.description}</TableCell>
+                      <TableCell>{new Date(tx.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          {tx.method === "Bank Transfer" && <BanknoteIcon className="mr-1 h-3 w-3" />}
+                          {tx.method === "Credit Card" && <CreditCard className="mr-1 h-3 w-3" />}
+                          {tx.method === "System" && <Clock className="mr-1 h-3 w-3" />}
+                          {tx.method}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={tx.status === "completed" ? "default" : "outline"}>{tx.status}</Badge>
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-medium ${
+                          tx.type === "deposit" || tx.type === "interest"
+                            ? "text-green-600"
+                            : tx.type === "withdrawal"
+                              ? "text-red-600"
+                              : ""
+                        }`}
+                      >
+                        {tx.type === "deposit" || tx.type === "interest" ? "+" : "-"}${tx.amount?.toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-2">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => setViewTransaction(tx)}>
+                                <Eye className="h-4 w-4" />
+                                <span className="sr-only">View</span>
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[600px]">
+                              <DialogHeader>
+                                <DialogTitle>Transaction Details</DialogTitle>
+                                <DialogDescription>Detailed information about the transaction.</DialogDescription>
+                              </DialogHeader>
+                              {viewTransaction && (
+                                <div className="grid gap-4 py-4">
+                                  <div className="flex items-center gap-4">
+                                    <div
+                                      className={`rounded-full p-3 ${
+                                        viewTransaction.type === "deposit"
+                                          ? "bg-green-100 text-green-600"
+                                          : viewTransaction.type === "withdrawal"
+                                            ? "bg-red-100 text-red-600"
+                                            : "bg-amber-100 text-amber-600"
+                                      }`}
+                                    >
+                                      {viewTransaction.type === "deposit" && <ArrowUpRight className="h-6 w-6" />}
+                                      {viewTransaction.type === "withdrawal" && <ArrowDownRight className="h-6 w-6" />}
+                                      {viewTransaction.type === "interest" && <Clock className="h-6 w-6" />}
+                                    </div>
+                                    <div>
+                                      <h3 className="text-lg font-semibold">{viewTransaction.description}</h3>
+                                      <p className="text-sm text-muted-foreground">{viewTransaction.type} transaction</p>
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <Label className="text-sm text-muted-foreground">Transaction ID</Label>
+                                      <p>{viewTransaction.id}</p>
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm text-muted-foreground">Customer</Label>
+                                      <p>
+                                        {viewTransaction.customer?.name || 'N/A'} ({viewTransaction.customer_id})
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm text-muted-foreground">Jar</Label>
+                                      <p>{viewTransaction.jar?.name || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm text-muted-foreground">Date</Label>
+                                      <p>{new Date(viewTransaction.created_at).toLocaleString()}</p>
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm text-muted-foreground">Method</Label>
+                                      <p>{viewTransaction.method}</p>
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm text-muted-foreground">Status</Label>
+                                      <p>
+                                        <Badge variant={viewTransaction.status === "completed" ? "default" : "outline"}>
+                                          {viewTransaction.status}
+                                        </Badge>
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm text-muted-foreground">Amount</Label>
+                                      <p
+                                        className={`font-medium ${
+                                          viewTransaction.type === "deposit" || viewTransaction.type === "interest"
+                                            ? "text-green-600"
+                                            : viewTransaction.type === "withdrawal"
+                                              ? "text-red-600"
+                                              : ""
+                                        }`}
+                                      >
+                                        {viewTransaction.type === "deposit" || viewTransaction.type === "interest"
+                                          ? "+"
+                                          : "-"}
+                                        ${viewTransaction.amount?.toLocaleString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              <DialogFooter>
+                                <Button variant="outline">Print Receipt</Button>
+                                {viewTransaction?.status === "pending" && <Button>Approve Transaction</Button>}
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">More</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Eye className="mr-2 h-4 w-4" /> View Details
+                              </DropdownMenuItem>
+                              {tx.status === "pending" && (
+                                <>
+                                  <DropdownMenuItem>
+                                    <ArrowUpRight className="mr-2 h-4 w-4 text-green-500" /> Approve
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="text-destructive">
+                                    <ArrowDownRight className="mr-2 h-4 w-4" /> Reject
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
