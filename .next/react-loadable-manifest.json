@@ -1,4 +1,22 @@
 {
+  "app/admin/customers/page.tsx -> jspdf": {
+    "id": "app/admin/customers/page.tsx -> jspdf",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_pnpm_jspdf_3_0_1_node_modules_jspdf_dist_jspdf_es_min_js.js"
+    ]
+  },
+  "app/admin/customers/page.tsx -> jspdf-autotable": {
+    "id": "app/admin/customers/page.tsx -> jspdf-autotable",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_pnpm_jspdf-autotable_5_0_2_jspdf_3_0_1_node_modules_jspdf-aut-c92533.js"
+    ]
+  },
+  "app/admin/customers/page.tsx -> xlsx": {
+    "id": "app/admin/customers/page.tsx -> xlsx",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_pnpm_xlsx_0_18_5_node_modules_xlsx_xlsx_mjs.js"
+    ]
+  },
   "app/admin/jars/page.tsx -> jspdf": {
     "id": "app/admin/jars/page.tsx -> jspdf",
     "files": [
@@ -13,6 +31,24 @@
   },
   "app/admin/jars/page.tsx -> xlsx": {
     "id": "app/admin/jars/page.tsx -> xlsx",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_pnpm_xlsx_0_18_5_node_modules_xlsx_xlsx_mjs.js"
+    ]
+  },
+  "lib/services/customer.service.ts -> pdfmake/build/pdfmake": {
+    "id": "lib/services/customer.service.ts -> pdfmake/build/pdfmake",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_pnpm_pdfmake_0_2_19_node_modules_pdfmake_build_pdfmake_js.js"
+    ]
+  },
+  "lib/services/customer.service.ts -> pdfmake/build/vfs_fonts": {
+    "id": "lib/services/customer.service.ts -> pdfmake/build/vfs_fonts",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_pnpm_pdfmake_0_2_19_node_modules_pdfmake_build_vfs_fonts_js.js"
+    ]
+  },
+  "lib/services/customer.service.ts -> xlsx": {
+    "id": "lib/services/customer.service.ts -> xlsx",
     "files": [
       "static/chunks/_app-pages-browser_node_modules_pnpm_xlsx_0_18_5_node_modules_xlsx_xlsx_mjs.js"
     ]

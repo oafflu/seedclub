@@ -9,7 +9,8 @@
     "lint": "next lint",
     "migrate:email": "tsx scripts/migrate-email-settings.ts",
     "init:email": "tsx scripts/init-email-settings.ts",
-    "seed-customer": "NODE_ENV=development tsx scripts/seed-customer.ts"
+    "seed-customer": "NODE_ENV=development tsx scripts/seed-customer.ts",
+    "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "latest",
@@ -45,13 +46,12 @@
     "@stripe/stripe-js": "^2.4.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.49.4",
-    "@types/bcryptjs": "^3.0.0",
     "@types/grecaptcha": "^3.0.9",
     "@types/nodemailer": "^6.4.14",
+    "@types/pdfkit": "^0.13.9",
     "@types/uuid": "^9.0.8",
     "@types/xlsx": "^0.0.36",
     "autoprefixer": "^10.4.20",
-    "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
@@ -65,6 +65,8 @@
     "next": "15.2.4",
     "next-themes": "^0.4.4",
     "nodemailer": "^6.9.9",
+    "pdfkit": "^0.17.0",
+    "pdfmake": "^0.2.19",
     "pusher": "^5.2.0",
     "pusher-js": "^8.4.0",
     "react": "^19",
@@ -74,6 +76,7 @@
     "react-hot-toast": "^2.5.2",
     "react-resizable-panels": "^2.1.7",
     "recharts": "latest",
+    "resend": "^4.5.0",
     "sonner": "^1.7.1",
     "stripe": "^14.25.0",
     "tailwind-merge": "^2.5.5",
@@ -85,9 +88,11 @@
     "zod": "latest"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^22.15.3",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19",
+    "bcryptjs": "^3.0.2",
     "postcss": "^8",
     "tailwindcss": "^3.4.17",
     "ts-node": "^10.9.2",

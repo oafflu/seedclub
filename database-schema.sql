@@ -486,3 +486,28 @@ BEGIN
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Customer Profiles Table
+CREATE TABLE customer_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID UNIQUE NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    address_line1 VARCHAR(255),
+    address_line2 VARCHAR(255),
+    city VARCHAR(100),
+    state VARCHAR(100),
+    zip_code VARCHAR(20),
+    country VARCHAR(100),
+    date_of_birth DATE,
+    tax_id VARCHAR(50),
+    occupation VARCHAR(100),
+    employer_name VARCHAR(100),
+    annual_income DECIMAL(12,2),
+    source_of_funds VARCHAR(50),
+    notes TEXT,
+    receive_marketing_emails BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Add index for faster lookups
+CREATE INDEX idx_customer_profiles_customer_id ON customer_profiles(customer_id);

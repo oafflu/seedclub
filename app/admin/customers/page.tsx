@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Search,
   Filter,
@@ -13,6 +13,7 @@ import {
   Edit,
   Trash2,
   ChevronDown,
+  Loader2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -41,111 +42,290 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useRouter } from "next/navigation"
+import { CustomerProfile } from "@/lib/services/customer.service"
+import { toast } from "@/components/ui/use-toast"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-// Mock data for customers
-const customers = [
-  {
-    id: "CUST-001",
-    name: "John Smith",
-    email: "john.smith@example.com",
-    phone: "+1 (555) 123-4567",
-    status: "active",
-    joinDate: "2023-01-15",
-    totalInvested: 25000,
-    jars: 3,
-    kycStatus: "verified",
-  },
-  {
-    id: "CUST-002",
-    name: "Sarah Johnson",
-    email: "sarah.j@example.com",
-    phone: "+1 (555) 987-6543",
-    status: "active",
-    joinDate: "2023-02-22",
-    totalInvested: 42000,
-    jars: 2,
-    kycStatus: "verified",
-  },
-  {
-    id: "CUST-003",
-    name: "Michael Chen",
-    email: "michael.c@example.com",
-    phone: "+1 (555) 456-7890",
-    status: "inactive",
-    joinDate: "2023-03-10",
-    totalInvested: 15000,
-    jars: 1,
-    kycStatus: "pending",
-  },
-  {
-    id: "CUST-004",
-    name: "Emily Davis",
-    email: "emily.d@example.com",
-    phone: "+1 (555) 234-5678",
-    status: "active",
-    joinDate: "2023-04-05",
-    totalInvested: 75000,
-    jars: 4,
-    kycStatus: "verified",
-  },
-  {
-    id: "CUST-005",
-    name: "Robert Wilson",
-    email: "robert.w@example.com",
-    phone: "+1 (555) 876-5432",
-    status: "active",
-    joinDate: "2023-05-18",
-    totalInvested: 30000,
-    jars: 2,
-    kycStatus: "verified",
-  },
-  {
-    id: "CUST-006",
-    name: "Jennifer Lee",
-    email: "jennifer.l@example.com",
-    phone: "+1 (555) 345-6789",
-    status: "inactive",
-    joinDate: "2023-06-30",
-    totalInvested: 0,
-    jars: 0,
-    kycStatus: "rejected",
-  },
-  {
-    id: "CUST-007",
-    name: "David Brown",
-    email: "david.b@example.com",
-    phone: "+1 (555) 654-3210",
-    status: "active",
-    joinDate: "2023-07-12",
-    totalInvested: 50000,
-    jars: 3,
-    kycStatus: "verified",
-  },
-  {
-    id: "CUST-008",
-    name: "Lisa Martinez",
-    email: "lisa.m@example.com",
-    phone: "+1 (555) 789-0123",
-    status: "active",
-    joinDate: "2023-08-25",
-    totalInvested: 18000,
-    jars: 1,
-    kycStatus: "verified",
-  },
-]
+interface FilterOptions {
+  activeOnly: boolean
+  kycVerified: boolean
+  hasInvestments: boolean
+}
 
 export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([])
-  const [viewCustomer, setViewCustomer] = useState<any>(null)
+  const [viewCustomer, setViewCustomer] = useState<CustomerProfile | null>(null)
+  const [customers, setCustomers] = useState<CustomerProfile[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState("all")
+  const [filters, setFilters] = useState<FilterOptions>({
+    activeOnly: false,
+    kycVerified: false,
+    hasInvestments: false,
+  })
   const router = useRouter()
 
-  const filteredCustomers = customers.filter(
-    (customer) =>
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  useEffect(() => {
+    loadCustomers()
+  }, [])
+
+  const loadCustomers = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const response = await fetch("/api/admin/customers")
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to load customers")
+      }
+      const data = await response.json()
+      setCustomers(data)
+    } catch (error: any) {
+      console.error("Error loading customers:", error)
+      setError(error.message || "Failed to load customers")
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load customers. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleExport = async (format: "csv" | "excel" | "pdf") => {
+    try {
+      // Prepare data for export
+      const data = customers.map(customer => ({
+        "ID": customer.id,
+        "First Name": customer.firstName,
+        "Last Name": customer.lastName,
+        "Email": customer.email,
+        "Phone": customer.phone,
+        "Status": customer.status,
+        "KYC Status": customer.kycStatus,
+        "Total Invested": customer.totalInvested?.toLocaleString() || "0.00",
+        "Number of Jars": customer.jars || 0,
+        "Join Date": new Date(customer.createdAt).toLocaleDateString(),
+        "Address": `${customer.addressLine1 || ""}${customer.addressLine2 ? `, ${customer.addressLine2}` : ""}`,
+        "City": customer.city || "",
+        "State": customer.state || "",
+        "Zip Code": customer.zipCode || "",
+        "Country": customer.country || ""
+      }));
+
+      let blob: Blob;
+      let filename: string;
+
+      switch (format) {
+        case 'csv': {
+          // Convert data to CSV
+          const csvContent = [
+            Object.keys(data[0]).join(','),
+            ...data.map(row => Object.values(row).join(','))
+          ].join('\n');
+          blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          filename = `customers_export_${new Date().toISOString().split('T')[0]}.csv`;
+          break;
+        }
+
+        case 'excel': {
+          // Use xlsx library to create Excel file
+          const XLSX = await import('xlsx');
+          const ws = XLSX.utils.json_to_sheet(data);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, 'Customers');
+          const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+          blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          filename = `customers_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+          break;
+        }
+
+        case 'pdf': {
+          // Use jspdf and jspdf-autotable for PDF generation
+          const { jsPDF } = await import('jspdf');
+          const { default: autoTable } = await import('jspdf-autotable');
+          
+          const doc = new jsPDF();
+          autoTable(doc, {
+            head: [Object.keys(data[0])],
+            body: data.map(row => Object.values(row)),
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [66, 139, 202] }
+          });
+          
+          blob = doc.output('blob');
+          filename = `customers_export_${new Date().toISOString().split('T')[0]}.pdf`;
+          break;
+        }
+
+        default:
+          throw new Error('Unsupported export format');
+      }
+
+      // Create download link and trigger download
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Export successful",
+        description: `Customers have been exported as ${format.toUpperCase()}`,
+        duration: 5000,
+      });
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      toast({
+        title: "Export failed",
+        description: "There was a problem exporting the data",
+        variant: "destructive",
+        duration: 5000,
+      });
+    }
+  }
+
+  const handleDeleteCustomer = async (customerId: string) => {
+    try {
+      const response = await fetch(`/api/admin/customers/${customerId}`, {
+        method: "DELETE",
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to delete customer")
+      }
+
+      toast({
+        title: "Success",
+        description: "Customer deleted successfully.",
+      })
+      loadCustomers()
+    } catch (error) {
+      console.error("Error deleting customer:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete customer. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleUpdateKYCStatus = async (customerId: string, status: "verified" | "pending" | "rejected") => {
+    try {
+      const customer = customers.find(c => c.id === customerId)
+      if (!customer) {
+        throw new Error("Customer not found")
+      }
+
+      const response = await fetch(`/api/admin/customers/${customerId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: customerId,
+          firstName: customer.firstName,
+          lastName: customer.lastName,
+          email: customer.email,
+          phone: customer.phone,
+          status: customer.status,
+          kycStatus: status,
+          addressLine1: customer.addressLine1,
+          addressLine2: customer.addressLine2,
+          city: customer.city,
+          state: customer.state,
+          zipCode: customer.zipCode,
+          country: customer.country,
+          dateOfBirth: customer.dateOfBirth,
+          taxId: customer.taxId,
+          occupation: customer.occupation,
+          employerName: customer.employerName,
+          annualIncome: customer.annualIncome,
+          sourceOfFunds: customer.sourceOfFunds,
+          notes: customer.notes,
+          receiveMarketingEmails: customer.receiveMarketingEmails
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to update KYC status")
+      }
+
+      toast({
+        title: "Success",
+        description: "KYC status updated successfully.",
+      })
+      loadCustomers()
+    } catch (error) {
+      console.error("Error updating KYC status:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update KYC status. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSendEmail = async (customerId: string) => {
+    try {
+      const response = await fetch("/api/admin/customers/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ customerId }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to send email")
+      }
+
+      toast({
+        title: "Success",
+        description: "Email sent successfully.",
+      })
+    } catch (error) {
+      console.error("Error sending email:", error)
+      toast({
+        title: "Error",
+        description: "Failed to send email. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const filteredCustomers = customers.filter((customer) => {
+    // Search filter
+    const searchMatch =
+      customer.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.id.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+      customer.id.toLowerCase().includes(searchTerm.toLowerCase())
+
+    // Tab filter
+    const tabMatch =
+      activeTab === "all" ||
+      (activeTab === "active" && customer.status === "active") ||
+      (activeTab === "inactive" && customer.status === "inactive")
+
+    // Additional filters
+    const activeMatch = !filters.activeOnly || customer.status === "active"
+    const kycMatch = !filters.kycVerified || customer.kycStatus === "verified"
+    const investmentMatch = !filters.hasInvestments || (customer.jars && customer.jars > 0)
+
+    return searchMatch && tabMatch && activeMatch && kycMatch && investmentMatch
+  })
 
   const toggleCustomerSelection = (customerId: string) => {
     setSelectedCustomers((prev) =>
@@ -159,6 +339,13 @@ export default function CustomersPage() {
     } else {
       setSelectedCustomers(filteredCustomers.map((c) => c.id))
     }
+  }
+
+  const handleFilterChange = (key: keyof FilterOptions) => {
+    setFilters((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }))
   }
 
   return (
@@ -176,6 +363,15 @@ export default function CustomersPage() {
           <CardDescription>Manage and monitor all customer accounts</CardDescription>
         </CardHeader>
         <CardContent>
+          {error && (
+            <div className="mb-4">
+              <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            </div>
+          )}
+
           <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
             <div className="flex flex-1 items-center space-x-2">
               <div className="relative flex-1 md:max-w-sm">
@@ -199,16 +395,16 @@ export default function CustomersPage() {
                 <DropdownMenuContent align="end" className="w-[200px]">
                   <DropdownMenuLabel>Filter by</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <Checkbox id="status" className="mr-2" />
+                  <DropdownMenuItem onSelect={() => handleFilterChange("activeOnly")}>
+                    <Checkbox id="status" className="mr-2" checked={filters.activeOnly} />
                     <Label htmlFor="status">Active Only</Label>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Checkbox id="kyc" className="mr-2" />
+                  <DropdownMenuItem onSelect={() => handleFilterChange("kycVerified")}>
+                    <Checkbox id="kyc" className="mr-2" checked={filters.kycVerified} />
                     <Label htmlFor="kyc">KYC Verified</Label>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Checkbox id="invested" className="mr-2" />
+                  <DropdownMenuItem onSelect={() => handleFilterChange("hasInvestments")}>
+                    <Checkbox id="invested" className="mr-2" checked={filters.hasInvestments} />
                     <Label htmlFor="invested">Has Investments</Label>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -216,7 +412,7 @@ export default function CustomersPage() {
             </div>
 
             <div className="flex items-center space-x-2">
-              <Tabs defaultValue="all">
+              <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
                 <TabsList>
                   <TabsTrigger value="all">All</TabsTrigger>
                   <TabsTrigger value="active">Active</TabsTrigger>
@@ -224,181 +420,276 @@ export default function CustomersPage() {
                 </TabsList>
               </Tabs>
 
-              <Button variant="outline" size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Download className="mr-2 h-4 w-4" />
+                    Export
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => handleExport("csv")}>Export as CSV</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => handleExport("excel")}>Export as Excel</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => handleExport("pdf")}>Export as PDF</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
-          <div className="mt-6 rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[40px]">
-                    <Checkbox
-                      checked={selectedCustomers.length === filteredCustomers.length && filteredCustomers.length > 0}
-                      onCheckedChange={toggleAllCustomers}
-                    />
-                  </TableHead>
-                  <TableHead className="w-[100px]">ID</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>KYC Status</TableHead>
-                  <TableHead className="text-right">Total Invested</TableHead>
-                  <TableHead className="text-center">Jars</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : customers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="text-muted-foreground">No customers found</div>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => router.push("/admin/customers/add")}
+              >
+                <Plus className="mr-2 h-4 w-4" /> Add Customer
+              </Button>
+            </div>
+          ) : (
+            <div className="mt-6 rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[40px]">
                       <Checkbox
-                        checked={selectedCustomers.includes(customer.id)}
-                        onCheckedChange={() => toggleCustomerSelection(customer.id)}
+                        checked={selectedCustomers.length === filteredCustomers.length && filteredCustomers.length > 0}
+                        onCheckedChange={toggleAllCustomers}
                       />
-                    </TableCell>
-                    <TableCell className="font-medium">{customer.id}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback>{customer.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="font-medium">{customer.name}</div>
-                          <div className="text-xs text-muted-foreground">{customer.email}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={customer.status === "active" ? "default" : "secondary"}>{customer.status}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          customer.kycStatus === "verified"
-                            ? "default"
-                            : customer.kycStatus === "pending"
-                              ? "outline"
-                              : "destructive"
-                        }
-                      >
-                        {customer.kycStatus}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">${customer.totalInvested.toLocaleString()}</TableCell>
-                    <TableCell className="text-center">{customer.jars}</TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-2">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => setViewCustomer(customer)}>
-                              <Eye className="h-4 w-4" />
-                              <span className="sr-only">View</span>
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="sm:max-w-[600px]">
-                            <DialogHeader>
-                              <DialogTitle>Customer Details</DialogTitle>
-                              <DialogDescription>Detailed information about the customer.</DialogDescription>
-                            </DialogHeader>
-                            {viewCustomer && (
-                              <div className="grid gap-4 py-4">
-                                <div className="flex items-center gap-4">
-                                  <Avatar className="h-16 w-16">
-                                    <AvatarFallback className="text-lg">{viewCustomer.name.charAt(0)}</AvatarFallback>
-                                  </Avatar>
-                                  <div>
-                                    <h3 className="text-lg font-semibold">{viewCustomer.name}</h3>
-                                    <p className="text-sm text-muted-foreground">{viewCustomer.email}</p>
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <Label className="text-sm text-muted-foreground">Customer ID</Label>
-                                    <p>{viewCustomer.id}</p>
-                                  </div>
-                                  <div>
-                                    <Label className="text-sm text-muted-foreground">Phone</Label>
-                                    <p>{viewCustomer.phone}</p>
-                                  </div>
-                                  <div>
-                                    <Label className="text-sm text-muted-foreground">Join Date</Label>
-                                    <p>{viewCustomer.joinDate}</p>
-                                  </div>
-                                  <div>
-                                    <Label className="text-sm text-muted-foreground">Status</Label>
-                                    <p>
-                                      <Badge variant={viewCustomer.status === "active" ? "default" : "secondary"}>
-                                        {viewCustomer.status}
-                                      </Badge>
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <Label className="text-sm text-muted-foreground">KYC Status</Label>
-                                    <p>
-                                      <Badge
-                                        variant={
-                                          viewCustomer.kycStatus === "verified"
-                                            ? "default"
-                                            : viewCustomer.kycStatus === "pending"
-                                              ? "outline"
-                                              : "destructive"
-                                        }
-                                      >
-                                        {viewCustomer.kycStatus}
-                                      </Badge>
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <Label className="text-sm text-muted-foreground">Total Invested</Label>
-                                    <p>${viewCustomer.totalInvested.toLocaleString()}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            <DialogFooter>
-                              <Button variant="outline">Edit Customer</Button>
-                              <Button>View Investments</Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => router.push(`/admin/customers/edit/${customer.id}`)}
-                        >
-                          <Edit className="h-4 w-4" />
-                          <span className="sr-only">Edit</span>
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">More</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Mail className="mr-2 h-4 w-4" /> Email Customer
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Phone className="mr-2 h-4 w-4" /> Call Customer
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete Customer
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
+                    </TableHead>
+                    <TableHead className="w-[100px]">ID</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>KYC Status</TableHead>
+                    <TableHead className="text-right">Total Invested</TableHead>
+                    <TableHead className="text-center">Jars</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredCustomers.map((customer) => (
+                    <TableRow key={customer.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedCustomers.includes(customer.id)}
+                          onCheckedChange={() => toggleCustomerSelection(customer.id)}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">{customer.id}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback>{customer.firstName.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-medium">{`${customer.firstName} ${customer.lastName}`}</div>
+                            <div className="text-xs text-muted-foreground">{customer.email}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={customer.status === "active" ? "default" : "secondary"}>
+                            {customer.status}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                const response = await fetch(`/api/admin/customers/${customer.id}`, {
+                                  method: "PUT",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({
+                                    id: customer.id,
+                                    status: customer.status === "active" ? "inactive" : "active"
+                                  }),
+                                })
+
+                                if (!response.ok) {
+                                  throw new Error("Failed to update customer status")
+                                }
+
+                                toast({
+                                  title: "Success",
+                                  description: `Customer account ${customer.status === "active" ? "deactivated" : "activated"} successfully.`,
+                                })
+                                loadCustomers()
+                              } catch (error) {
+                                console.error("Error updating customer status:", error)
+                                toast({
+                                  title: "Error",
+                                  description: "Failed to update customer status. Please try again.",
+                                  variant: "destructive",
+                                })
+                              }
+                            }}
+                          >
+                            {customer.status === "active" ? "Deactivate" : "Activate"}
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={
+                              customer.kycStatus === "verified"
+                                ? "default"
+                                : customer.kycStatus === "pending"
+                                  ? "outline"
+                                  : "destructive"
+                            }
+                          >
+                            {customer.kycStatus}
+                          </Badge>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                Change Status
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onSelect={() => handleUpdateKYCStatus(customer.id, "verified")}>
+                                Mark as Verified
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => handleUpdateKYCStatus(customer.id, "pending")}>
+                                Mark as Pending
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => handleUpdateKYCStatus(customer.id, "rejected")}>
+                                Mark as Rejected
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">${customer.totalInvested?.toLocaleString()}</TableCell>
+                      <TableCell className="text-center">{customer.jars}</TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-2">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => setViewCustomer(customer)}>
+                                <Eye className="h-4 w-4" />
+                                <span className="sr-only">View</span>
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[600px]">
+                              <DialogHeader>
+                                <DialogTitle>Customer Details</DialogTitle>
+                                <DialogDescription>Detailed information about the customer.</DialogDescription>
+                              </DialogHeader>
+                              {viewCustomer && (
+                                <div className="grid gap-4 py-4">
+                                  <div className="flex items-center gap-4">
+                                    <Avatar className="h-16 w-16">
+                                      <AvatarFallback className="text-lg">{viewCustomer.firstName.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <h3 className="text-lg font-semibold">{`${viewCustomer.firstName} ${viewCustomer.lastName}`}</h3>
+                                      <p className="text-sm text-muted-foreground">{viewCustomer.email}</p>
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <Label className="text-sm text-muted-foreground">Customer ID</Label>
+                                      <p>{viewCustomer.id}</p>
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm text-muted-foreground">Phone</Label>
+                                      <p>{viewCustomer.phone}</p>
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm text-muted-foreground">Join Date</Label>
+                                      <p>{new Date(viewCustomer.createdAt).toLocaleDateString()}</p>
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm text-muted-foreground">Status</Label>
+                                      <p>
+                                        <Badge variant={viewCustomer.status === "active" ? "default" : "secondary"}>
+                                          {viewCustomer.status}
+                                        </Badge>
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm text-muted-foreground">KYC Status</Label>
+                                      <p>
+                                        <Badge
+                                          variant={
+                                            viewCustomer.kycStatus === "verified"
+                                              ? "default"
+                                              : viewCustomer.kycStatus === "pending"
+                                                ? "outline"
+                                                : "destructive"
+                                          }
+                                        >
+                                          {viewCustomer.kycStatus}
+                                        </Badge>
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm text-muted-foreground">Total Invested</Label>
+                                      <p>${viewCustomer.totalInvested?.toLocaleString()}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              <DialogFooter>
+                                <Button variant="outline" onClick={() => router.push(`/admin/customers/edit/${viewCustomer?.id}`)}>
+                                  Edit Customer
+                                </Button>
+                                <Button onClick={() => router.push(`/admin/customers/${viewCustomer?.id}/investments`)}>
+                                  View Investments
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => router.push(`/admin/customers/edit/${customer.id}`)}
+                          >
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Edit</span>
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">More</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onSelect={() => handleSendEmail(customer.id)}>
+                                <Mail className="mr-2 h-4 w-4" /> Email Customer
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Phone className="mr-2 h-4 w-4" /> Call Customer
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onSelect={() => handleDeleteCustomer(customer.id)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete Customer
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

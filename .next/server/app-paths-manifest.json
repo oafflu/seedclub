@@ -1,8 +1,9 @@
 {
-  "/api/admin/jars/route": "app/api/admin/jars/route.js",
-  "/admin/users-roles/page": "app/admin/users-roles/page.js",
-  "/admin/jars/page": "app/admin/jars/page.js",
+  "/api/admin/customers/[id]/route": "app/api/admin/customers/[id]/route.js",
+  "/api/admin/customers/route": "app/api/admin/customers/route.js",
   "/admin/customers/page": "app/admin/customers/page.js",
-  "/admin/dashboard/page": "app/admin/dashboard/page.js",
-  "/admin/profile/page": "app/admin/profile/page.js"
+  "/admin/customers/add/page": "app/admin/customers/add/page.js",
+  "/admin/jars/page": "app/admin/jars/page.js",
+  "/admin/transactions/page": "app/admin/transactions/page.js",
+  "/admin/transactions/pending/page": "app/admin/transactions/pending/page.js"
 }

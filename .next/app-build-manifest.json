@@ -11,6 +11,16 @@
       "static/chunks/main-app.js",
       "static/chunks/app/admin/layout.js"
     ],
+    "/admin/customers/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/customers/loading.js"
+    ],
+    "/admin/customers/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/customers/page.js"
+    ],
     "/admin/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -20,6 +30,36 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/admin/dashboard/page.js"
+    ],
+    "/api/admin/customers/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/customers/route.js"
+    ],
+    "/admin/customers/edit/[id]/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/customers/edit/[id]/loading.js"
+    ],
+    "/admin/customers/edit/[id]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/customers/edit/[id]/page.js"
+    ],
+    "/api/admin/customers/[id]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/customers/[id]/route.js"
+    ],
+    "/admin/customers/add/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/customers/add/loading.js"
+    ],
+    "/admin/customers/add/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/customers/add/page.js"
     ],
     "/admin/jars/loading": [
       "static/chunks/webpack.js",
@@ -36,35 +76,25 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/admin/jars/route.js"
     ],
-    "/admin/customers/loading": [
+    "/admin/transactions/loading": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/customers/loading.js"
+      "static/chunks/app/admin/transactions/loading.js"
     ],
-    "/admin/customers/page": [
+    "/admin/transactions/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/customers/page.js"
+      "static/chunks/app/admin/transactions/page.js"
     ],
-    "/admin/users-roles/loading": [
+    "/admin/transactions/pending/loading": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/users-roles/loading.js"
+      "static/chunks/app/admin/transactions/pending/loading.js"
     ],
-    "/admin/users-roles/page": [
+    "/admin/transactions/pending/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/users-roles/page.js"
-    ],
-    "/admin/profile/loading": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/admin/profile/loading.js"
-    ],
-    "/admin/profile/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/admin/profile/page.js"
+      "static/chunks/app/admin/transactions/pending/page.js"
     ]
   }
 }
