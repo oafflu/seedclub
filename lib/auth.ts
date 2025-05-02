@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { randomBytes, createHash } from 'crypto'
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -162,4 +164,20 @@ export async function createAuditLog(
       ip_address: ip,
       user_agent: userAgent
     })
+}
+
+export async function getSession(isApiRoute = false) {
+  try {
+    const supabase = isApiRoute 
+      ? createRouteHandlerClient({ cookies })
+      : createServerComponentClient({ cookies })
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    return session
+  } catch (error) {
+    console.error('Error getting session:', error)
+    return null
+  }
 } 

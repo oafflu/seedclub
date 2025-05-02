@@ -1,48 +1,243 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { z } from "zod"
-import { format, addMonths } from "date-fns"
-import { CalendarIcon, PiggyBank, ArrowRight, CheckCircle2, XCircle, Upload } from "lucide-react"
+import * as z from "zod"
+import { format } from "date-fns"
+import { 
+  CalendarIcon, 
+  PiggyBank, 
+  ArrowRight, 
+  Upload, 
+  X, 
+  Sprout, 
+  Leaf,
+  Trees,
+  Flower,
+  TreeDeciduous,
+  Palmtree
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
+import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "@/components/ui/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { logAuditEvent } from "@/lib/services/audit-logger"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+
+// Define default icons
+const defaultIcons = [
+  { name: 'piggy-bank', icon: PiggyBank, label: 'Piggy Bank' },
+  { name: 'sprout', icon: Sprout, label: 'Sprout' },
+  { name: 'leaf', icon: Leaf, label: 'Leaf' },
+  { name: 'trees', icon: Trees, label: 'Trees' },
+  { name: 'palm', icon: Palmtree, label: 'Palm Tree' },
+  { name: 'oak', icon: TreeDeciduous, label: 'Oak Tree' },
+  { name: 'flower', icon: Flower, label: 'Flower' }
+]
 
 // Form schema
 const formSchema = z.object({
-  name: z.string().min(3, { message: "Jar name must be at least 3 characters" }),
-  description: z.string().min(10, { message: "Description must be at least 10 characters" }),
-  minimumAmount: z.coerce.number().min(100, { message: "Minimum investment must be at least $100" }),
-  startDate: z.date({ required_error: "Please select a start date" }),
-  status: z.boolean().default(true),
-  iconType: z.enum(["upload", "default"]),
-  iconFile: z.any().optional(),
+  name: z.string().min(1, "Name is required"),
+  description: z.string().min(1, "Description is required"),
+  minimumAmount: z.coerce.number().min(10, "Minimum amount must be at least 10"),
+  maximumAmount: z.coerce.number().min(0, "Maximum amount must be positive"),
+  earlyWithdrawalPenalty: z.coerce.number().min(0, "Early withdrawal penalty must be positive"),
+  status: z.boolean(),
+  iconType: z.string(),
+  selectedIcon: z.string().optional(),
+  iconFile: z.any().nullable()
 })
 
 type FormValues = z.infer<typeof formSchema>
 
 export default function CreateJarPage() {
   const router = useRouter()
-  const [calculatedValue12, setCalculatedValue12] = useState<number>(0)
-  const [calculatedValue24, setCalculatedValue24] = useState<number>(0)
-  const [calculatedValue36, setCalculatedValue36] = useState<number>(0)
-  const [maturityDate12, setMaturityDate12] = useState<Date | null>(null)
-  const [maturityDate24, setMaturityDate24] = useState<Date | null>(null)
-  const [maturityDate36, setMaturityDate36] = useState<Date | null>(null)
-  const [previewIcon, setPreviewIcon] = useState<string | null>(null)
   const [selectedTab, setSelectedTab] = useState("12-month")
+  const [previewIcon, setPreviewIcon] = useState<string | null>(null)
+  const [uploadingIcon, setUploadingIcon] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const supabase = createClientComponentClient()
+
+  // Generate a secure hash for the password
+  const generateSecureHash = (email: string) => {
+    return btoa(email + '_' + Date.now()).replace(/[^a-zA-Z0-9]/g, '')
+  }
+
+  // Ensure admin role exists
+  const ensureAdminRole = async () => {
+    // Check if admin role exists
+    const { data: existingRole, error: checkError } = await supabase
+      .from('admin_roles')
+      .select('id')
+      .eq('name', 'admin')
+      .single()
+
+    if (checkError && checkError.code === 'PGRST116') {
+      // Role doesn't exist, create it
+      const { data: newRole, error: createError } = await supabase
+        .from('admin_roles')
+        .insert([{
+          name: 'admin',
+          description: 'Administrator role with system access'
+        }])
+        .select()
+        .single()
+
+      if (createError) {
+        console.error('Failed to create admin role:', createError)
+        throw new Error('Failed to create admin role')
+      }
+
+      return newRole
+    } else if (checkError) {
+      console.error('Error checking admin role:', checkError)
+      throw new Error('Error checking admin role')
+    }
+
+    return existingRole
+  }
+
+  // Check authentication on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session }, error: authError } = await supabase.auth.getSession()
+        
+        if (authError || !session) {
+          console.error('Auth error:', authError)
+          setError('Authentication failed. Please log in again.')
+          router.push("/admin/login")
+          return
+        }
+
+        // First check if user exists in admin_users
+        const { data: adminUser, error: adminError } = await supabase
+          .from('admin_users')
+          .select('id, role, email')
+          .eq('id', session.user.id)
+          .single()
+
+        if (adminError) {
+          // If the user doesn't exist in admin_users, try to create them
+          if (adminError.code === 'PGRST116') { // PostgreSQL not found error
+            console.log('Creating new admin user for:', session.user.email)
+            
+            try {
+              // First check if a user with this email already exists
+              const { data: existingUser, error: existingError } = await supabase
+                .from('admin_users')
+                .select('id')
+                .eq('email', session.user.email)
+                .single()
+
+              if (existingUser) {
+                // Update the existing user with the new ID
+                const { data: updatedUser, error: updateError } = await supabase
+                  .from('admin_users')
+                  .update({
+                    id: session.user.id,
+                    last_login_at: new Date().toISOString(),
+                    is_active: true
+                  })
+                  .eq('email', session.user.email)
+                  .select()
+                  .single()
+
+                if (updateError) {
+                  console.error('Failed to update admin user:', updateError)
+                  setError(`Failed to update admin user: ${updateError.message || 'Unknown error'}`)
+                  return
+                }
+
+                setIsAuthenticated(true)
+                return
+              }
+
+              // Ensure admin role exists
+              const adminRole = await ensureAdminRole()
+
+              // Generate a secure hash for the password
+              const securePassword = generateSecureHash(session.user.email || '')
+
+              // Create the admin user
+              const { data: newAdminUser, error: createUserError } = await supabase
+                .from('admin_users')
+                .insert([{
+                  id: session.user.id,
+                  email: session.user.email,
+                  encrypted_password: securePassword,
+                  role: 'admin',
+                  is_active: true,
+                  first_name: session.user.user_metadata?.first_name || null,
+                  last_name: session.user.user_metadata?.last_name || null,
+                  last_login_at: new Date().toISOString()
+                }])
+                .select()
+                .single()
+
+              if (createUserError) {
+                console.error('Failed to create admin user:', createUserError)
+                const errorMessage = createUserError.message || 'Unknown error occurred'
+                setError(`Failed to create admin user: ${errorMessage}`)
+                return
+              }
+
+              // Link the user to the admin role in the junction table
+              const { error: linkError } = await supabase
+                .from('admin_user_roles')
+                .insert([{
+                  user_id: session.user.id,
+                  role_id: adminRole.id
+                }])
+
+              if (linkError) {
+                console.error('Failed to link admin role:', linkError)
+                // Don't return here, the user is still created
+              }
+
+              setIsAuthenticated(true)
+              return
+            } catch (error: any) {
+              console.error('Error in admin user creation process:', error)
+              setError(error.message || 'Failed to setup admin user')
+              return
+            }
+          }
+
+          console.error('Admin user error:', adminError)
+          setError('Authentication error. Please try logging in again.')
+          router.push("/admin/login")
+          return
+        }
+
+        // Check if user has admin or super_admin role
+        if (!['admin', 'super_admin'].includes(adminUser.role)) {
+          console.error('Insufficient permissions')
+          setError('You do not have permission to access this page.')
+          router.push("/admin/dashboard")
+          return
+        }
+
+        setIsAuthenticated(true)
+      } catch (error: any) {
+        console.error('Auth check error:', error)
+        setError(error.message || 'An unexpected error occurred. Please try again.')
+        router.push("/admin/login")
+      }
+    }
+
+    checkAuth()
+  }, [router, supabase])
 
   // Initialize form with default values
   const form = useForm<FormValues>({
@@ -50,237 +245,243 @@ export default function CreateJarPage() {
     defaultValues: {
       name: "",
       description: "",
-      minimumAmount: 1000,
-      startDate: new Date(),
+      minimumAmount: 10,
+      maximumAmount: 0,
+      earlyWithdrawalPenalty: 0,
       status: true,
       iconType: "default",
-    },
+      selectedIcon: "piggy-bank",
+      iconFile: null
+    }
   })
 
-  const { watch, setValue } = form
-  const watchInitialAmount = watch("minimumAmount")
-  const watchStartDate = watch("startDate")
-  const watchIconType = watch("iconType")
-
-  // Calculate maturity dates and expected values
-  useEffect(() => {
-    if (watchStartDate) {
-      // 12-month jar
-      const newMaturityDate12 = addMonths(watchStartDate, 12)
-      setMaturityDate12(newMaturityDate12)
-      const expectedValue12 = watchInitialAmount * Math.pow(1 + 10 / 100, 1)
-      setCalculatedValue12(Math.round(expectedValue12))
-
-      // 24-month jar
-      const newMaturityDate24 = addMonths(watchStartDate, 24)
-      setMaturityDate24(newMaturityDate24)
-      const expectedValue24 = watchInitialAmount * Math.pow(1 + 12 / 100, 2)
-      setCalculatedValue24(Math.round(expectedValue24))
-
-      // 36-month jar
-      const newMaturityDate36 = addMonths(watchStartDate, 36)
-      setMaturityDate36(newMaturityDate36)
-      const expectedValue36 = watchInitialAmount * Math.pow(1 + 15 / 100, 3)
-      setCalculatedValue36(Math.round(expectedValue36))
-    }
-  }, [watchInitialAmount, watchStartDate])
-
   // Handle file upload
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      // Check if file is an image
-      if (!file.type.startsWith("image/")) {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      // Reset to default values if no file selected
+      setPreviewIcon(null)
+      form.setValue("iconFile", null)
+      form.setValue("iconType", "default")
+      return
+    }
+
+    try {
+      setUploadingIcon(true)
+
+      // Validate file type and size
+      if (!file.type.includes('image/')) {
         toast({
           title: "Invalid file type",
-          description: "Please upload an image file (PNG or SVG)",
+          description: "Please upload an image file",
           variant: "destructive",
         })
         return
       }
 
-      // Check if file is PNG or SVG
-      if (file.type !== "image/png" && file.type !== "image/svg+xml") {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
         toast({
-          title: "Invalid file type",
-          description: "Please upload a PNG or SVG file",
+          title: "File too large",
+          description: "Please upload an image smaller than 5MB",
           variant: "destructive",
         })
         return
       }
 
-      // Create a preview URL
+      // Create a preview
       const reader = new FileReader()
-      reader.onload = () => {
+      reader.onloadend = () => {
         setPreviewIcon(reader.result as string)
       }
       reader.readAsDataURL(file)
 
-      // Set the file in the form
-      setValue("iconFile", file)
+      // Store file for form submission
+      form.setValue("iconFile", file)
+      form.setValue("iconType", "custom")
+    } catch (error) {
+      console.error('Error handling file:', error)
+      toast({
+        title: "Error uploading file",
+        description: "There was a problem uploading your file",
+        variant: "destructive",
+      })
+      // Reset to default values on error
+      setPreviewIcon(null)
+      form.setValue("iconFile", null)
+      form.setValue("iconType", "default")
+    } finally {
+      setUploadingIcon(false)
     }
   }
 
   // Form submission handler
-  function onSubmit(data: FormValues) {
-    console.log("Jar created:", data)
+  const onSubmit = async (data: FormValues) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Error",
+        description: "You must be authenticated to create a jar",
+        variant: "destructive",
+      })
+      return
+    }
 
-    toast({
-      title: "Jar created successfully",
-      description: `"${data.name}" jar is now available to customers`,
-    })
+    try {
+      setIsLoading(true)
+      setError(null)
 
-    setTimeout(() => {
-      router.push("/admin/jars")
-    }, 1500)
+      // Get current session
+      const { data: { session }, error: authError } = await supabase.auth.getSession()
+      if (authError || !session) {
+        throw new Error('Unauthorized - No valid session')
+      }
+
+      let iconName = null
+      if (data.iconType === "custom" && data.iconFile) {
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('jar-icons')
+          .upload(`${session.user.id}/${Date.now()}-${data.iconFile.name}`, data.iconFile)
+
+        if (uploadError) throw uploadError
+        iconName = uploadData.path
+      } else if (data.iconType === "default" && data.selectedIcon) {
+        iconName = data.selectedIcon
+      }
+
+      // Prepare jar data based on selected term
+      const termMonths = parseInt(selectedTab.split('-')[0])
+      const interestRate = termMonths === 12 ? 10 : termMonths === 24 ? 12 : 15
+
+      // Create jar
+      const { data: jar, error: jarError } = await supabase
+        .from('jars')
+        .insert([{
+          name: data.name,
+          description: data.description,
+          minimum_investment: data.minimumAmount,
+          maximum_investment: data.maximumAmount || null,
+          early_withdrawal_penalty: data.earlyWithdrawalPenalty || null,
+          is_active: data.status,
+          icon_name: iconName,
+          term_months: termMonths,
+          interest_rate: interestRate,
+          created_by: session.user.id
+        }])
+        .select()
+        .single()
+
+      if (jarError) throw jarError
+
+      // Create audit log
+      await supabase.from('audit_logs').insert({
+        user_id: session.user.id,
+        action: 'create',
+        resource: 'jars',
+        resource_id: jar.id,
+        details: {
+          name: data.name,
+          is_active: data.status
+        }
+      })
+
+      toast({
+        title: "Success!",
+        description: `${data.name} has been created successfully.`,
+        variant: "default",
+      })
+
+      setTimeout(() => {
+        router.push("/admin/jars")
+        router.refresh()
+      }, 1000)
+
+    } catch (err: any) {
+      console.error('Error creating jar:', err)
+      setError(err.message || 'Error creating jar')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // If not authenticated, show loading state with error if present
+  if (!isAuthenticated) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold">Checking authorization...</h2>
+          <p className="text-sm text-muted-foreground">Please wait</p>
+          {error && (
+            <div className="mt-4 text-sm text-red-600">
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Create New Investment Jar</h1>
-        <Button variant="outline" onClick={() => router.push("/admin/jars")}>
+        <h1 className="text-2xl font-bold">Create New Jar</h1>
+        <Button variant="outline" onClick={() => router.back()}>
           Cancel
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <div className="md:col-span-2">
+      {error && (
+        <div className="px-6">
+          <Alert variant="destructive">
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Jar Details</CardTitle>
+          <CardDescription>Configure the investment jar details</CardDescription>
+        </CardHeader>
+        <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Jar Details</CardTitle>
-                  <CardDescription>Enter the basic information for this investment jar</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Jar Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. Sprout Fund" {...field} />
-                        </FormControl>
-                        <FormDescription>A descriptive name for this investment jar</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. For your small but mighty savings" {...field} />
-                        </FormControl>
-                        <FormDescription>A brief description for customers</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="iconType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Jar Icon</FormLabel>
-                        <div className="flex space-x-4">
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="radio"
-                              id="default-icon"
-                              checked={field.value === "default"}
-                              onChange={() => field.onChange("default")}
-                              className="h-4 w-4 text-primary"
-                            />
-                            <label htmlFor="default-icon" className="text-sm">
-                              Use default icon
-                            </label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="radio"
-                              id="custom-icon"
-                              checked={field.value === "upload"}
-                              onChange={() => field.onChange("upload")}
-                              className="h-4 w-4 text-primary"
-                            />
-                            <label htmlFor="custom-icon" className="text-sm">
-                              Upload custom icon
-                            </label>
-                          </div>
-                        </div>
-                        <FormDescription>Choose an icon for this jar</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {watchIconType === "upload" && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-center">
-                        <label
-                          htmlFor="icon-upload"
-                          className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                        >
-                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            {previewIcon ? (
-                              <img
-                                src={previewIcon || "/placeholder.svg"}
-                                alt="Icon preview"
-                                className="w-16 h-16 mb-2"
-                              />
-                            ) : (
-                              <>
-                                <Upload className="w-8 h-8 mb-2 text-gray-500" />
-                                <p className="mb-2 text-sm text-gray-500">
-                                  <span className="font-semibold">Click to upload</span> or drag and drop
-                                </p>
-                                <p className="text-xs text-gray-500">PNG or SVG (MAX. 800x800px)</p>
-                              </>
-                            )}
-                          </div>
-                          <input
-                            id="icon-upload"
-                            type="file"
-                            accept=".png,.svg"
-                            className="hidden"
-                            onChange={handleFileChange}
-                          />
-                        </label>
-                      </div>
-                      {previewIcon && (
-                        <div className="flex justify-center">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setPreviewIcon(null)
-                              setValue("iconFile", undefined)
-                            }}
-                          >
-                            Remove Image
-                          </Button>
-                        </div>
-                      )}
-                    </div>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <div className="grid gap-6">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Jar Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Sprout Fund" {...field} />
+                      </FormControl>
+                      <FormDescription>A unique name for this investment jar</FormDescription>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                </CardContent>
-              </Card>
+                />
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Financial Details</CardTitle>
-                  <CardDescription>Set the financial parameters for this jar</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Describe the investment jar and its benefits..."
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Explain the jar's features and benefits to potential investors
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid gap-4 md:grid-cols-2">
                   <FormField
                     control={form.control}
                     name="minimumAmount"
@@ -288,341 +489,279 @@ export default function CreateJarPage() {
                       <FormItem>
                         <FormLabel>Minimum Investment</FormLabel>
                         <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
-                            <Input type="number" className="pl-7" {...field} />
-                          </div>
+                          <Input 
+                            type="number" 
+                            min={10} 
+                            placeholder="10" 
+                            {...field}
+                            onChange={(e) => field.onChange(Number(e.target.value))}
+                            value={field.value || ''}
+                          />
                         </FormControl>
-                        <FormDescription>Minimum investment amount for this jar</FormDescription>
+                        <FormDescription>Minimum amount required to invest</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  <div className="rounded-md border p-4">
-                    <h3 className="font-medium mb-2">APY Rates</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span>12-Month Term</span>
-                        <span className="font-medium text-green-600">10% APY</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>24-Month Term</span>
-                        <span className="font-medium text-green-600">12% APY</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>36-Month Term</span>
-                        <span className="font-medium text-green-600">15% APY</span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      All jars offer these three APY options for customers to choose from
+                  <FormField
+                    control={form.control}
+                    name="maximumAmount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Maximum Investment (Optional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min={0} 
+                            placeholder="10000" 
+                            {...field}
+                            onChange={(e) => field.onChange(Number(e.target.value))}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormDescription>Maximum amount allowed per investor</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="earlyWithdrawalPenalty"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Early Withdrawal Penalty % (Optional)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min={0} 
+                          max={100} 
+                          placeholder="5" 
+                          {...field}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                          value={field.value || ''}
+                        />
+                      </FormControl>
+                      <FormDescription>Penalty percentage for early withdrawals</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-medium">Term and Interest Rate</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Select the investment term and view the corresponding interest rate
                     </p>
                   </div>
-                </CardContent>
-              </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Timing</CardTitle>
-                  <CardDescription>Set the start date for this investment jar</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                  <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="12-month">12 Months (10% APY)</TabsTrigger>
+                      <TabsTrigger value="24-month">24 Months (12% APY)</TabsTrigger>
+                      <TabsTrigger value="36-month">36 Months (15% APY)</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="12-month">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>12-Month Term</CardTitle>
+                          <CardDescription>Short-term investment with 10% APY</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">10% APY</div>
+                          <p className="text-sm text-muted-foreground">
+                            Perfect for short-term savings goals
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                    <TabsContent value="24-month">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>24-Month Term</CardTitle>
+                          <CardDescription>Medium-term investment with 12% APY</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">12% APY</div>
+                          <p className="text-sm text-muted-foreground">
+                            Balanced option for medium-term growth
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                    <TabsContent value="36-month">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>36-Month Term</CardTitle>
+                          <CardDescription>Long-term investment with 15% APY</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">15% APY</div>
+                          <p className="text-sm text-muted-foreground">
+                            Maximum returns for long-term investors
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-medium">Jar Icon</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Choose a default icon or upload your own
+                    </p>
+                  </div>
+
                   <FormField
                     control={form.control}
-                    name="startDate"
+                    name="iconType"
                     render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Start Date</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button variant={"outline"} className="w-full pl-3 text-left font-normal">
-                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      <FormItem>
+                        <div className="grid gap-4">
+                          <div className="flex items-center space-x-4">
+                            <Button
+                              type="button"
+                              variant={field.value === 'default' ? 'default' : 'outline'}
+                              className="flex-1"
+                              onClick={() => {
+                                field.onChange('default')
+                                setPreviewIcon(null)
+                                form.setValue("iconFile", null)
+                              }}
+                            >
+                              <PiggyBank className="mr-2 h-4 w-4" />
+                              Use Default Icon
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={field.value === 'custom' ? 'default' : 'outline'}
+                              className="flex-1"
+                              onClick={() => document.getElementById('icon-upload')?.click()}
+                            >
+                              <Upload className="mr-2 h-4 w-4" />
+                              Upload Custom Icon
+                            </Button>
+                            <input
+                              id="icon-upload"
+                              type="file"
+                              className="hidden"
+                              accept="image/*"
+                              onChange={handleFileChange}
+                            />
+                          </div>
+
+                          {field.value === 'default' && (
+                            <FormField
+                              control={form.control}
+                              name="selectedIcon"
+                              render={({ field: iconField }) => (
+                                <FormItem>
+                                  <div className="grid grid-cols-4 gap-4">
+                                    {defaultIcons.map((icon) => {
+                                      const Icon = icon.icon
+                                      return (
+                                        <Button
+                                          key={icon.name}
+                                          type="button"
+                                          variant={iconField.value === icon.name ? 'default' : 'outline'}
+                                          className="flex flex-col items-center p-4 h-auto"
+                                          onClick={() => iconField.onChange(icon.name)}
+                                        >
+                                          <Icon className="h-8 w-8 mb-2" />
+                                          <span className="text-sm">{icon.label}</span>
+                                        </Button>
+                                      )
+                                    })}
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                          )}
+
+                          {field.value === 'custom' && previewIcon && (
+                            <div className="relative aspect-square w-20 overflow-hidden rounded-lg border">
+                              <img
+                                src={previewIcon}
+                                alt="Icon preview"
+                                className="h-full w-full object-cover"
+                              />
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                className="absolute right-1 top-1"
+                                onClick={() => {
+                                  setPreviewIcon(null)
+                                  field.onChange('default')
+                                  form.setValue("iconFile", null)
+                                }}
+                              >
+                                <X className="h-4 w-4" />
                               </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                          </PopoverContent>
-                        </Popover>
-                        <FormDescription>When the investment period begins</FormDescription>
+                            </div>
+                          )}
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                </CardContent>
-              </Card>
+                </div>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Status</CardTitle>
-                  <CardDescription>Set the initial status of this jar</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">Active Status</FormLabel>
-                          <FormDescription>Determines if this jar is active and available to customers</FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch checked={field.value} onCheckedChange={field.onChange} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </CardContent>
-                <CardFooter className="flex justify-end space-x-2">
-                  <Button variant="outline" type="button" onClick={() => router.push("/admin/jars")}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Create Jar</Button>
-                </CardFooter>
-              </Card>
+                <Separator />
+
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">Activate Jar</FormLabel>
+                        <FormDescription>
+                          Make this jar available to customers immediately
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="flex justify-end space-x-4">
+                <Button variant="outline" onClick={() => router.back()} disabled={isLoading}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      Create Jar
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </div>
             </form>
           </Form>
-        </div>
-
-        <div>
-          <Card className="sticky top-6">
-            <CardHeader>
-              <CardTitle>Jar Preview</CardTitle>
-              <CardDescription>Expected value at maturity</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <Tabs defaultValue="12-month" value={selectedTab} onValueChange={setSelectedTab}>
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="12-month">12 Months</TabsTrigger>
-                  <TabsTrigger value="24-month">24 Months</TabsTrigger>
-                  <TabsTrigger value="36-month">36 Months</TabsTrigger>
-                </TabsList>
-                <TabsContent value="12-month" className="pt-4">
-                  <div className="flex items-center justify-center">
-                    <div className="relative h-32 w-32">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        {previewIcon ? (
-                          <img
-                            src={previewIcon || "/placeholder.svg"}
-                            alt="Jar icon"
-                            className="h-20 w-20 opacity-20"
-                          />
-                        ) : (
-                          <PiggyBank className="h-20 w-20 text-primary/20" />
-                        )}
-                      </div>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-2xl font-bold">${watchInitialAmount?.toLocaleString() || 0}</span>
-                      </div>
-                    </div>
-                    <ArrowRight className="mx-4 h-6 w-6 text-muted-foreground" />
-                    <div className="relative h-32 w-32">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        {previewIcon ? (
-                          <img
-                            src={previewIcon || "/placeholder.svg"}
-                            alt="Jar icon"
-                            className="h-24 w-24 opacity-30"
-                          />
-                        ) : (
-                          <PiggyBank className="h-24 w-24 text-primary/30" />
-                        )}
-                      </div>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-3xl font-bold text-primary">${calculatedValue12.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator className="my-4" />
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Minimum Investment</span>
-                      <span className="font-medium">${watchInitialAmount?.toLocaleString() || 0}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Interest Rate</span>
-                      <span className="font-medium">10% APY</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Term Length</span>
-                      <span className="font-medium">12 months</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Maturity Date</span>
-                      <span className="font-medium">
-                        {maturityDate12 ? format(maturityDate12, "MMM d, yyyy") : "-"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Expected Interest</span>
-                      <span className="font-medium text-green-600">
-                        ${(calculatedValue12 - (watchInitialAmount || 0)).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="24-month" className="pt-4">
-                  <div className="flex items-center justify-center">
-                    <div className="relative h-32 w-32">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        {previewIcon ? (
-                          <img
-                            src={previewIcon || "/placeholder.svg"}
-                            alt="Jar icon"
-                            className="h-20 w-20 opacity-20"
-                          />
-                        ) : (
-                          <PiggyBank className="h-20 w-20 text-primary/20" />
-                        )}
-                      </div>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-2xl font-bold">${watchInitialAmount?.toLocaleString() || 0}</span>
-                      </div>
-                    </div>
-                    <ArrowRight className="mx-4 h-6 w-6 text-muted-foreground" />
-                    <div className="relative h-32 w-32">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        {previewIcon ? (
-                          <img
-                            src={previewIcon || "/placeholder.svg"}
-                            alt="Jar icon"
-                            className="h-24 w-24 opacity-30"
-                          />
-                        ) : (
-                          <PiggyBank className="h-24 w-24 text-primary/30" />
-                        )}
-                      </div>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-3xl font-bold text-primary">${calculatedValue24.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator className="my-4" />
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Minimum Investment</span>
-                      <span className="font-medium">${watchInitialAmount?.toLocaleString() || 0}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Interest Rate</span>
-                      <span className="font-medium">12% APY</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Term Length</span>
-                      <span className="font-medium">24 months</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Maturity Date</span>
-                      <span className="font-medium">
-                        {maturityDate24 ? format(maturityDate24, "MMM d, yyyy") : "-"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Expected Interest</span>
-                      <span className="font-medium text-green-600">
-                        ${(calculatedValue24 - (watchInitialAmount || 0)).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="36-month" className="pt-4">
-                  <div className="flex items-center justify-center">
-                    <div className="relative h-32 w-32">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        {previewIcon ? (
-                          <img
-                            src={previewIcon || "/placeholder.svg"}
-                            alt="Jar icon"
-                            className="h-20 w-20 opacity-20"
-                          />
-                        ) : (
-                          <PiggyBank className="h-20 w-20 text-primary/20" />
-                        )}
-                      </div>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-2xl font-bold">${watchInitialAmount?.toLocaleString() || 0}</span>
-                      </div>
-                    </div>
-                    <ArrowRight className="mx-4 h-6 w-6 text-muted-foreground" />
-                    <div className="relative h-32 w-32">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        {previewIcon ? (
-                          <img
-                            src={previewIcon || "/placeholder.svg"}
-                            alt="Jar icon"
-                            className="h-24 w-24 opacity-30"
-                          />
-                        ) : (
-                          <PiggyBank className="h-24 w-24 text-primary/30" />
-                        )}
-                      </div>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-3xl font-bold text-primary">${calculatedValue36.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator className="my-4" />
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Minimum Investment</span>
-                      <span className="font-medium">${watchInitialAmount?.toLocaleString() || 0}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Interest Rate</span>
-                      <span className="font-medium">15% APY</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Term Length</span>
-                      <span className="font-medium">36 months</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Maturity Date</span>
-                      <span className="font-medium">
-                        {maturityDate36 ? format(maturityDate36, "MMM d, yyyy") : "-"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Expected Interest</span>
-                      <span className="font-medium text-green-600">
-                        ${(calculatedValue36 - (watchInitialAmount || 0)).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-
-              <Separator />
-
-              <div className="rounded-md bg-muted p-3">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  <span className="text-sm font-medium">No early withdrawal fees</span>
-                </div>
-                <div className="mt-2 flex items-center space-x-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  <span className="text-sm font-medium">Interest compounds daily</span>
-                </div>
-                <div className="mt-2 flex items-center space-x-2">
-                  <XCircle className="h-5 w-5 text-red-500" />
-                  <span className="text-sm font-medium">Early withdrawal may affect APY</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

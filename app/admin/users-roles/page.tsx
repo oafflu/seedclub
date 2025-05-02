@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Search,
   Filter,
@@ -15,6 +15,12 @@ import {
   CheckCircle,
   XCircle,
   Lock,
+  Loader2,
+  User,
+  Mail,
+  Shield,
+  Copy,
+  UserPlus,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,163 +51,78 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { adminService } from "@/lib/services/admin"
+import type { AdminUser, AdminRole, AdminPermission } from "@/types/database"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
-// Mock data for admin users
-const adminUsers = [
-  {
-    id: "USER-001",
-    name: "John Admin",
-    email: "john.admin@seedclub.com",
-    role: "administrator",
-    status: "active",
-    lastLogin: "2024-01-20T14:30:00Z",
-    createdAt: "2023-01-15T10:00:00Z",
-    avatar: null,
-  },
-  {
-    id: "USER-002",
-    name: "Sarah Manager",
-    email: "sarah.manager@seedclub.com",
-    role: "manager",
-    status: "active",
-    lastLogin: "2024-01-19T09:15:00Z",
-    createdAt: "2023-02-10T11:30:00Z",
-    avatar: null,
-  },
-  {
-    id: "USER-003",
-    name: "Michael Support",
-    email: "michael.support@seedclub.com",
-    role: "support",
-    status: "active",
-    lastLogin: "2024-01-18T16:45:00Z",
-    createdAt: "2023-03-05T09:00:00Z",
-    avatar: null,
-  },
-  {
-    id: "USER-004",
-    name: "Emily Analyst",
-    email: "emily.analyst@seedclub.com",
-    role: "analyst",
-    status: "active",
-    lastLogin: "2024-01-17T11:20:00Z",
-    createdAt: "2023-04-12T14:15:00Z",
-    avatar: null,
-  },
-  {
-    id: "USER-005",
-    name: "Robert Viewer",
-    email: "robert.viewer@seedclub.com",
-    role: "viewer",
-    status: "inactive",
-    lastLogin: "2023-12-15T10:30:00Z",
-    createdAt: "2023-05-20T08:45:00Z",
-    avatar: null,
-  },
-]
-
-// Mock data for roles
-const roles = [
-  {
-    id: "ROLE-001",
-    name: "Administrator",
-    description: "Full system access with all permissions",
-    userCount: 1,
-    isDefault: false,
-    permissions: {
-      dashboard: { view: true, edit: true },
-      customers: { view: true, edit: true, create: true, delete: true },
-      jars: { view: true, edit: true, create: true, delete: true },
-      transactions: { view: true, edit: true, create: true, delete: true },
-      reports: { view: true, export: true },
-      settings: { view: true, edit: true },
-      users: { view: true, edit: true, create: true, delete: true },
-    },
-  },
-  {
-    id: "ROLE-002",
-    name: "Manager",
-    description: "Manage customers, jars, and transactions",
-    userCount: 1,
-    isDefault: false,
-    permissions: {
-      dashboard: { view: true, edit: false },
-      customers: { view: true, edit: true, create: true, delete: false },
-      jars: { view: true, edit: true, create: true, delete: false },
-      transactions: { view: true, edit: true, create: true, delete: false },
-      reports: { view: true, export: true },
-      settings: { view: false, edit: false },
-      users: { view: false, edit: false, create: false, delete: false },
-    },
-  },
-  {
-    id: "ROLE-003",
-    name: "Support",
-    description: "Customer support and basic transaction management",
-    userCount: 1,
-    isDefault: true,
-    permissions: {
-      dashboard: { view: true, edit: false },
-      customers: { view: true, edit: false, create: false, delete: false },
-      jars: { view: true, edit: false, create: false, delete: false },
-      transactions: { view: true, edit: false, create: false, delete: false },
-      reports: { view: false, export: false },
-      settings: { view: false, edit: false },
-      users: { view: false, edit: false, create: false, delete: false },
-    },
-  },
-  {
-    id: "ROLE-004",
-    name: "Analyst",
-    description: "View and analyze data, generate reports",
-    userCount: 1,
-    isDefault: false,
-    permissions: {
-      dashboard: { view: true, edit: false },
-      customers: { view: true, edit: false, create: false, delete: false },
-      jars: { view: true, edit: false, create: false, delete: false },
-      transactions: { view: true, edit: false, create: false, delete: false },
-      reports: { view: true, export: true },
-      settings: { view: false, edit: false },
-      users: { view: false, edit: false, create: false, delete: false },
-    },
-  },
-  {
-    id: "ROLE-005",
-    name: "Viewer",
-    description: "Read-only access to basic information",
-    userCount: 1,
-    isDefault: false,
-    permissions: {
-      dashboard: { view: true, edit: false },
-      customers: { view: true, edit: false, create: false, delete: false },
-      jars: { view: true, edit: false, create: false, delete: false },
-      transactions: { view: true, edit: false, create: false, delete: false },
-      reports: { view: false, export: false },
-      settings: { view: false, edit: false },
-      users: { view: false, edit: false, create: false, delete: false },
-    },
-  },
-]
-
-export default function UsersRolesPage() {
+export default function RolesAndPermissionsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedUsers, setSelectedUsers] = useState<string[]>([])
-  const [viewUser, setViewUser] = useState<any>(null)
-  const [viewRole, setViewRole] = useState<any>(null)
+  const [viewUser, setViewUser] = useState<AdminUser | null>(null)
+  const [viewRole, setViewRole] = useState<AdminRole | null>(null)
   const [activeTab, setActiveTab] = useState("users")
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [roles, setRoles] = useState<AdminRole[]>([])
+  const [permissions, setPermissions] = useState<AdminPermission[]>([])
+  const [loading, setLoading] = useState(true)
+  const [cloneRoleData, setCloneRoleData] = useState<{
+    roleId: string;
+    name: string;
+    description: string;
+  } | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [role, setRole] = useState("admin")
+  const [isAddingRole, setIsAddingRole] = useState(false)
+  const [isAddingUser, setIsAddingUser] = useState(false)
+  const [newRole, setNewRole] = useState({ name: "", description: "" })
+  const [newUser, setNewUser] = useState({ email: "", firstName: "", lastName: "", roleId: "" })
+  const router = useRouter()
+  const supabase = createClientComponentClient()
 
-  const filteredUsers = adminUsers.filter(
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const [usersData, rolesData, permissionsData] = await Promise.all([
+        adminService.getUsers(),
+        adminService.getRoles(),
+        adminService.getPermissions()
+      ])
+      setUsers(usersData)
+      setRoles(rolesData)
+      setPermissions(permissionsData)
+    } catch (error: any) {
+      console.error('Error loading data:', error)
+      const errorMessage = typeof error.message === 'string' ? error.message : 'Failed to load data'
+      toast.error(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredUsers = users.filter(
     (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.id.toLowerCase().includes(searchTerm.toLowerCase()),
+      (user.first_name && user.first_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (user.last_name && user.last_name.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   const filteredRoles = roles.filter(
     (role) =>
       role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      role.description.toLowerCase().includes(searchTerm.toLowerCase()),
+      (role.description && role.description.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   const toggleUserSelection = (userId: string) => {
@@ -216,19 +137,437 @@ export default function UsersRolesPage() {
     }
   }
 
+  const handleCreateUser = async (userData: Partial<AdminUser>) => {
+    try {
+      await adminService.createUser(userData)
+      await loadData()
+      toast.success('User created successfully')
+    } catch (error: any) {
+      console.error('Error creating user:', error)
+      const errorMessage = typeof error.message === 'string' ? error.message : 'Failed to create user'
+      toast.error(errorMessage)
+    }
+  }
+
+  const handleUpdateUser = async (id: string, updates: Partial<AdminUser>) => {
+    try {
+      await adminService.updateUser(id, updates)
+      await loadData()
+      toast.success('User updated successfully')
+    } catch (error: any) {
+      console.error('Error updating user:', error)
+      const errorMessage = typeof error.message === 'string' ? error.message : 'Failed to update user'
+      toast.error(errorMessage)
+    }
+  }
+
+  const handleDeleteUser = async (id: string) => {
+    try {
+      await adminService.deleteUser(id)
+      await loadData()
+      toast.success('User deleted successfully')
+    } catch (error: any) {
+      console.error('Error deleting user:', error)
+      const errorMessage = typeof error.message === 'string' ? error.message : 'Failed to delete user'
+      toast.error(errorMessage)
+    }
+  }
+
+  const handleCreateRole = async (roleData: Partial<AdminRole>) => {
+    try {
+      await adminService.createRole(roleData)
+      await loadData()
+      toast.success('Role created successfully')
+    } catch (error) {
+      console.error('Error creating role:', error)
+      toast.error('Failed to create role')
+    }
+  }
+
+  const handleUpdateRole = async (id: string, updates: Partial<AdminRole>) => {
+    try {
+      await adminService.updateRole(id, updates)
+      await loadData()
+      toast.success('Role updated successfully')
+    } catch (error) {
+      console.error('Error updating role:', error)
+      toast.error('Failed to update role')
+    }
+  }
+
+  const handleDeleteRole = async (id: string) => {
+    try {
+      await adminService.deleteRole(id)
+      await loadData()
+      toast.success('Role deleted successfully')
+    } catch (error) {
+      console.error('Error deleting role:', error)
+      toast.error('Failed to delete role')
+    }
+  }
+
+  const handleUpdateRolePermissions = async (roleId: string, permissionIds: string[]) => {
+    try {
+      await adminService.updateRolePermissions(roleId, permissionIds)
+      await loadData()
+      toast.success('Role permissions updated successfully')
+    } catch (error) {
+      console.error('Error updating role permissions:', error)
+      toast.error('Failed to update role permissions')
+    }
+  }
+
   // Format date
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'Never'
     const date = new Date(dateString)
     return date.toLocaleString()
+  }
+
+  const CloneRoleDialog = () => {
+    if (!cloneRoleData) return null
+
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault()
+      try {
+        await adminService.cloneRole(
+          cloneRoleData.roleId,
+          cloneRoleData.name,
+          cloneRoleData.description
+        )
+        toast.success('Role cloned successfully')
+        setCloneRoleData(null)
+        loadData()
+      } catch (error) {
+        console.error('Error cloning role:', error)
+        toast.error('Failed to clone role')
+      }
+    }
+
+    return (
+      <Dialog open={!!cloneRoleData} onOpenChange={() => setCloneRoleData(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clone Role</DialogTitle>
+            <DialogDescription>
+              Create a new role by cloning an existing one. The new role will inherit all permissions from the selected role.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="roleName">Role Name</Label>
+                <Input
+                  id="roleName"
+                  value={cloneRoleData.name}
+                  onChange={(e) => setCloneRoleData({ ...cloneRoleData, name: e.target.value })}
+                  placeholder="Enter role name"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="roleDescription">Description</Label>
+                <Input
+                  id="roleDescription"
+                  value={cloneRoleData.description}
+                  onChange={(e) => setCloneRoleData({ ...cloneRoleData, description: e.target.value })}
+                  placeholder="Enter role description"
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCloneRoleData(null)}>
+                Cancel
+              </Button>
+              <Button type="submit">Clone Role</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  const handleCreateAdmin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setIsLoading(true)
+
+    try {
+      // First check if the current user has super_admin role
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not authenticated')
+
+      const { data: currentUserRole, error: roleCheckError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .single()
+
+      if (roleCheckError || !currentUserRole || currentUserRole.role !== 'super_admin') {
+        throw new Error('Insufficient permissions. Only super admins can create admin users.')
+      }
+
+      // Create the admin user with Supabase auth
+      const { data: { user }, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          },
+        }
+      })
+
+      if (signUpError) throw signUpError
+
+      if (!user) {
+        throw new Error('No user created')
+      }
+
+      // Create user role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert([
+          {
+            user_id: user.id,
+            role: role // 'admin' or 'super_admin'
+          }
+        ])
+
+      if (roleError) throw roleError
+
+      // Create admin profile
+      const { error: profileError } = await supabase
+        .from('admins')
+        .insert([
+          {
+            id: user.id,
+            first_name: firstName,
+            last_name: lastName,
+            email: email,
+            is_active: true
+          }
+        ])
+
+      if (profileError) throw profileError
+
+      toast.success('Admin user created')
+
+      setEmail("")
+      setPassword("")
+      setRole("admin")
+      setIsDialogOpen(false)
+      
+      router.refresh()
+    } catch (error: any) {
+      console.error('Admin creation error:', error)
+      const errorMessage = typeof error.message === 'string' ? error.message : "Failed to create admin user"
+      setError(errorMessage)
+      toast.error(errorMessage)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleAddRole = async () => {
+    try {
+      await adminService.createRole(newRole)
+      setIsAddingRole(false)
+      setNewRole({ name: "", description: "" })
+      loadData()
+      toast.success('Role created successfully')
+    } catch (error: any) {
+      console.error('Error creating role:', error)
+      const errorMessage = typeof error?.message === 'string' ? error.message : 'Failed to create role'
+      toast.error(errorMessage)
+    }
+  }
+
+  const handleAddUser = async () => {
+    try {
+      const user = await adminService.createUser({
+        email: newUser.email,
+        first_name: newUser.firstName,
+        last_name: newUser.lastName,
+        role: "admin"
+      })
+
+      if (newUser.roleId) {
+        await adminService.updateUserRole(user.id, newUser.roleId)
+      }
+
+      setIsAddingUser(false)
+      setNewUser({ email: "", firstName: "", lastName: "", roleId: "" })
+      loadData()
+      toast.success('User created successfully')
+    } catch (error: any) {
+      console.error('Error creating user:', error)
+      const errorMessage = typeof error?.message === 'string' ? error.message : 'Failed to create user'
+      toast.error(errorMessage)
+    }
+  }
+
+  const handleCloneRole = async (roleId: string) => {
+    const role = roles.find(r => r.id === roleId)
+    if (!role) return
+
+    const newName = prompt("Enter name for the cloned role:", `${role.name} (Copy)`)
+    if (!newName) return
+
+    try {
+      await adminService.cloneRole(roleId, newName, role.description || "")
+      loadData()
+      toast.success('Role cloned successfully')
+    } catch (error: any) {
+      console.error('Error cloning role:', error)
+      const errorMessage = typeof error.message === 'string' ? error.message : "Failed to clone role"
+      toast.error(errorMessage)
+    }
+  }
+
+  const handleInitiatePasswordReset = async (userId: string) => {
+    try {
+      await adminService.initiatePasswordReset(userId)
+      toast.success('Password reset email has been sent')
+    } catch (error: any) {
+      console.error('Error initiating password reset:', error)
+      const errorMessage = typeof error.message === 'string' ? error.message : 'Failed to send password reset email'
+      toast.error(errorMessage)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">User & Role Management</h1>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" /> Add User
-        </Button>
+        <h1 className="text-2xl font-bold">Roles & Permissions</h1>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Admin User
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Admin User</DialogTitle>
+              <DialogDescription>
+                Create a new admin user with specific permissions. Only super admins can create new admin users.
+              </DialogDescription>
+            </DialogHeader>
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <form onSubmit={handleCreateAdmin} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="firstName"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="John"
+                      required
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="lastName"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Doe"
+                      required
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="admin@example.com"
+                    required
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="role">Admin Role</Label>
+                <div className="relative">
+                  <Shield className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Select value={role} onValueChange={setRole}>
+                    <SelectTrigger className="pl-10">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="super_admin">Super Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create Admin User"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Tabs defaultValue="users" value={activeTab} onValueChange={setActiveTab}>
@@ -320,14 +659,18 @@ export default function UsersRolesPage() {
                             onCheckedChange={() => toggleUserSelection(user.id)}
                           />
                         </TableCell>
-                        <TableCell className="font-medium">{user.id}</TableCell>
+                        <TableCell className="font-medium">{user.id.split('-')[0]}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Avatar className="h-8 w-8">
-                              <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                              <AvatarFallback>{user.first_name?.[0] || user.email[0].toUpperCase()}</AvatarFallback>
                             </Avatar>
                             <div>
-                              <div className="font-medium">{user.name}</div>
+                              <div className="font-medium">
+                                {user.first_name && user.last_name 
+                                  ? `${user.first_name} ${user.last_name}`
+                                  : user.email}
+                              </div>
                               <div className="text-xs text-muted-foreground">{user.email}</div>
                             </div>
                           </div>
@@ -338,12 +681,12 @@ export default function UsersRolesPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={user.status === "active" ? "default" : "secondary"} className="capitalize">
-                            {user.status}
+                          <Badge variant={user.is_active ? "default" : "secondary"} className="capitalize">
+                            {user.is_active ? 'active' : 'inactive'}
                           </Badge>
                         </TableCell>
-                        <TableCell>{formatDate(user.lastLogin)}</TableCell>
-                        <TableCell>{formatDate(user.createdAt)}</TableCell>
+                        <TableCell>{formatDate(user.last_login_at)}</TableCell>
+                        <TableCell>{formatDate(user.created_at)}</TableCell>
                         <TableCell>
                           <div className="flex justify-end gap-2">
                             <Dialog>
@@ -362,10 +705,16 @@ export default function UsersRolesPage() {
                                   <div className="grid gap-4 py-4">
                                     <div className="flex items-center gap-4">
                                       <Avatar className="h-16 w-16">
-                                        <AvatarFallback className="text-lg">{viewUser.name.charAt(0)}</AvatarFallback>
+                                        <AvatarFallback className="text-lg">
+                                          {viewUser.first_name?.[0] || viewUser.email[0].toUpperCase()}
+                                        </AvatarFallback>
                                       </Avatar>
                                       <div>
-                                        <h3 className="text-lg font-semibold">{viewUser.name}</h3>
+                                        <h3 className="text-lg font-semibold">
+                                          {viewUser.first_name && viewUser.last_name 
+                                            ? `${viewUser.first_name} ${viewUser.last_name}`
+                                            : viewUser.email}
+                                        </h3>
                                         <p className="text-sm text-muted-foreground">{viewUser.email}</p>
                                       </div>
                                     </div>
@@ -380,29 +729,40 @@ export default function UsersRolesPage() {
                                       </div>
                                       <div>
                                         <Label className="text-sm text-muted-foreground">Status</Label>
-                                        <p>
+                                        <div>
                                           <Badge
-                                            variant={viewUser.status === "active" ? "default" : "secondary"}
+                                            variant={viewUser.is_active ? "default" : "secondary"}
                                             className="capitalize"
                                           >
-                                            {viewUser.status}
+                                            {viewUser.is_active ? 'active' : 'inactive'}
                                           </Badge>
-                                        </p>
+                                        </div>
                                       </div>
                                       <div>
                                         <Label className="text-sm text-muted-foreground">Last Login</Label>
-                                        <p>{formatDate(viewUser.lastLogin)}</p>
+                                        <p>{formatDate(viewUser.last_login_at)}</p>
                                       </div>
                                       <div>
                                         <Label className="text-sm text-muted-foreground">Created At</Label>
-                                        <p>{formatDate(viewUser.createdAt)}</p>
+                                        <p>{formatDate(viewUser.created_at)}</p>
+                                      </div>
+                                      <div>
+                                        <Label className="text-sm text-muted-foreground">Failed Login Attempts</Label>
+                                        <p>{viewUser.failed_login_attempts}</p>
                                       </div>
                                     </div>
                                   </div>
                                 )}
                                 <DialogFooter>
-                                  <Button variant="outline">Edit User</Button>
-                                  <Button>Reset Password</Button>
+                                  <Button variant="outline" onClick={() => {
+                                    if (!viewUser) return
+                                    handleUpdateUser(viewUser.id, {
+                                      is_active: !viewUser.is_active
+                                    })
+                                  }}>
+                                    {viewUser?.is_active ? 'Deactivate' : 'Activate'} User
+                                  </Button>
+                                  <Button onClick={() => viewUser && handleInitiatePasswordReset(viewUser.id)}>Reset Password</Button>
                                 </DialogFooter>
                               </DialogContent>
                             </Dialog>
@@ -421,21 +781,18 @@ export default function UsersRolesPage() {
                                 <DropdownMenuItem>
                                   <UserCog className="mr-2 h-4 w-4" /> Change Role
                                 </DropdownMenuItem>
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => viewUser && handleInitiatePasswordReset(viewUser.id)}>
                                   <Lock className="mr-2 h-4 w-4" /> Reset Password
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                {user.status === "active" ? (
-                                  <DropdownMenuItem>
-                                    <XCircle className="mr-2 h-4 w-4 text-amber-500" /> Deactivate User
-                                  </DropdownMenuItem>
-                                ) : (
-                                  <DropdownMenuItem>
-                                    <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Activate User
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive">
+                                <DropdownMenuItem 
+                                  className="text-destructive"
+                                  onClick={() => {
+                                    if (confirm('Are you sure you want to delete this user?')) {
+                                      handleDeleteUser(user.id)
+                                    }
+                                  }}
+                                >
                                   <Trash2 className="mr-2 h-4 w-4" /> Delete User
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
@@ -459,11 +816,6 @@ export default function UsersRolesPage() {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="capitalize">{role.name}</CardTitle>
-                    {role.isDefault && (
-                      <Badge variant="outline" className="text-primary border-primary">
-                        Default
-                      </Badge>
-                    )}
                   </div>
                   <CardDescription>{role.description}</CardDescription>
                 </CardHeader>
@@ -471,48 +823,23 @@ export default function UsersRolesPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between text-sm">
                       <span>Users with this role:</span>
-                      <span className="font-medium">{role.userCount}</span>
+                      <span className="font-medium">
+                        {users.filter(u => u.role === role.name).length}
+                      </span>
                     </div>
                     <Separator />
                     <div className="space-y-2">
                       <h3 className="text-sm font-medium">Key Permissions:</h3>
                       <ul className="space-y-1 text-sm">
-                        {role.permissions.dashboard.view && (
-                          <li className="flex items-center">
-                            <CheckCircle className="mr-2 h-3 w-3 text-green-500" />
-                            View Dashboard
-                          </li>
-                        )}
-                        {role.permissions.customers.view && (
-                          <li className="flex items-center">
-                            <CheckCircle className="mr-2 h-3 w-3 text-green-500" />
-                            View Customers
-                          </li>
-                        )}
-                        {role.permissions.customers.edit && (
-                          <li className="flex items-center">
-                            <CheckCircle className="mr-2 h-3 w-3 text-green-500" />
-                            Edit Customers
-                          </li>
-                        )}
-                        {role.permissions.transactions.view && (
-                          <li className="flex items-center">
-                            <CheckCircle className="mr-2 h-3 w-3 text-green-500" />
-                            View Transactions
-                          </li>
-                        )}
-                        {role.permissions.reports.view && (
-                          <li className="flex items-center">
-                            <CheckCircle className="mr-2 h-3 w-3 text-green-500" />
-                            View Reports
-                          </li>
-                        )}
-                        {role.permissions.settings.edit && (
-                          <li className="flex items-center">
-                            <CheckCircle className="mr-2 h-3 w-3 text-green-500" />
-                            Edit Settings
-                          </li>
-                        )}
+                        {permissions
+                          .filter(p => p.resource === role.name)
+                          .map(permission => (
+                            <li key={permission.id} className="flex items-center">
+                              <CheckCircle className="mr-2 h-3 w-3 text-green-500" />
+                              {permission.description || permission.name}
+                            </li>
+                          ))
+                        }
                       </ul>
                     </div>
                   </div>
@@ -536,161 +863,51 @@ export default function UsersRolesPage() {
                               <h3 className="text-lg font-semibold capitalize">{viewRole.name}</h3>
                               <p className="text-sm text-muted-foreground">{viewRole.description}</p>
                             </div>
-                            {viewRole.isDefault && (
-                              <Badge variant="outline" className="text-primary border-primary">
-                                Default
-                              </Badge>
-                            )}
                           </div>
 
                           <div className="space-y-6">
-                            <div className="space-y-3">
-                              <h4 className="text-sm font-medium">Dashboard Permissions</h4>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="dashboard-view">View Dashboard</Label>
-                                  <Switch id="dashboard-view" checked={viewRole.permissions.dashboard.view} disabled />
+                            {['dashboard', 'customers', 'transactions', 'reports', 'settings', 'users'].map(resource => (
+                              <div key={resource} className="space-y-3">
+                                <h4 className="text-sm font-medium capitalize">{resource} Permissions</h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                  {permissions
+                                    .filter(p => p.resource === resource)
+                                    .map(permission => (
+                                      <div key={permission.id} className="flex items-center justify-between space-x-2">
+                                        <Label htmlFor={`${resource}-${permission.action}`}>
+                                          {permission.description || permission.name}
+                                        </Label>
+                                        <Switch
+                                          id={`${resource}-${permission.action}`}
+                                          checked={true}
+                                          onCheckedChange={(checked) => {
+                                            // TODO: Implement permission toggle
+                                            toast.info('Permission update coming soon')
+                                          }}
+                                        />
+                                      </div>
+                                    ))
+                                  }
                                 </div>
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="dashboard-edit">Edit Dashboard</Label>
-                                  <Switch id="dashboard-edit" checked={viewRole.permissions.dashboard.edit} disabled />
-                                </div>
+                                <Separator />
                               </div>
-                            </div>
-
-                            <Separator />
-
-                            <div className="space-y-3">
-                              <h4 className="text-sm font-medium">Customer Permissions</h4>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="customers-view">View Customers</Label>
-                                  <Switch id="customers-view" checked={viewRole.permissions.customers.view} disabled />
-                                </div>
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="customers-edit">Edit Customers</Label>
-                                  <Switch id="customers-edit" checked={viewRole.permissions.customers.edit} disabled />
-                                </div>
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="customers-create">Create Customers</Label>
-                                  <Switch
-                                    id="customers-create"
-                                    checked={viewRole.permissions.customers.create}
-                                    disabled
-                                  />
-                                </div>
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="customers-delete">Delete Customers</Label>
-                                  <Switch
-                                    id="customers-delete"
-                                    checked={viewRole.permissions.customers.delete}
-                                    disabled
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            <Separator />
-
-                            <div className="space-y-3">
-                              <h4 className="text-sm font-medium">Transaction Permissions</h4>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="transactions-view">View Transactions</Label>
-                                  <Switch
-                                    id="transactions-view"
-                                    checked={viewRole.permissions.transactions.view}
-                                    disabled
-                                  />
-                                </div>
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="transactions-edit">Edit Transactions</Label>
-                                  <Switch
-                                    id="transactions-edit"
-                                    checked={viewRole.permissions.transactions.edit}
-                                    disabled
-                                  />
-                                </div>
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="transactions-create">Create Transactions</Label>
-                                  <Switch
-                                    id="transactions-create"
-                                    checked={viewRole.permissions.transactions.create}
-                                    disabled
-                                  />
-                                </div>
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="transactions-delete">Delete Transactions</Label>
-                                  <Switch
-                                    id="transactions-delete"
-                                    checked={viewRole.permissions.transactions.delete}
-                                    disabled
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            <Separator />
-
-                            <div className="space-y-3">
-                              <h4 className="text-sm font-medium">Report Permissions</h4>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="reports-view">View Reports</Label>
-                                  <Switch id="reports-view" checked={viewRole.permissions.reports.view} disabled />
-                                </div>
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="reports-export">Export Reports</Label>
-                                  <Switch id="reports-export" checked={viewRole.permissions.reports.export} disabled />
-                                </div>
-                              </div>
-                            </div>
-
-                            <Separator />
-
-                            <div className="space-y-3">
-                              <h4 className="text-sm font-medium">Settings Permissions</h4>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="settings-view">View Settings</Label>
-                                  <Switch id="settings-view" checked={viewRole.permissions.settings.view} disabled />
-                                </div>
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="settings-edit">Edit Settings</Label>
-                                  <Switch id="settings-edit" checked={viewRole.permissions.settings.edit} disabled />
-                                </div>
-                              </div>
-                            </div>
-
-                            <Separator />
-
-                            <div className="space-y-3">
-                              <h4 className="text-sm font-medium">User Management Permissions</h4>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="users-view">View Users</Label>
-                                  <Switch id="users-view" checked={viewRole.permissions.users.view} disabled />
-                                </div>
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="users-edit">Edit Users</Label>
-                                  <Switch id="users-edit" checked={viewRole.permissions.users.edit} disabled />
-                                </div>
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="users-create">Create Users</Label>
-                                  <Switch id="users-create" checked={viewRole.permissions.users.create} disabled />
-                                </div>
-                                <div className="flex items-center justify-between space-x-2">
-                                  <Label htmlFor="users-delete">Delete Users</Label>
-                                  <Switch id="users-delete" checked={viewRole.permissions.users.delete} disabled />
-                                </div>
-                              </div>
-                            </div>
+                            ))}
                           </div>
                         </div>
                       )}
                       <DialogFooter>
-                        <Button variant="outline">Clone Role</Button>
-                        <Button>Edit Role</Button>
+                        <Button variant="outline" onClick={() => {
+                          if (!viewRole) return
+                          setCloneRoleData({
+                            roleId: viewRole.id,
+                            name: `${viewRole.name} (Copy)`,
+                            description: viewRole.description || ''
+                          })
+                        }}>Clone Role</Button>
+                        <Button onClick={() => {
+                          // TODO: Implement role editing
+                          toast.info('Role editing coming soon')
+                        }}>Edit Role</Button>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
@@ -708,54 +925,54 @@ export default function UsersRolesPage() {
               <CardDescription>Define a new role with custom permissions</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="role-name">Role Name</Label>
-                    <Input id="role-name" placeholder="Enter role name" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="role-description">Description</Label>
-                    <Input id="role-description" placeholder="Enter role description" />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="base-role">Base Role (Optional)</Label>
-                  <Select>
-                    <SelectTrigger id="base-role">
-                      <SelectValue placeholder="Select a base role to copy permissions" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roles.map((role) => (
-                        <SelectItem key={role.id} value={role.id}>
-                          {role.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Start with permissions from an existing role, or leave blank to start from scratch
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="default-role" className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <span>Make Default Role</span>
-                      <p className="text-sm text-muted-foreground">New users will be assigned this role by default</p>
+              <form onSubmit={async (e) => {
+                e.preventDefault()
+                const formData = new FormData(e.currentTarget)
+                await handleCreateRole({
+                  name: formData.get('roleName') as string,
+                  description: formData.get('roleDescription') as string,
+                })
+              }}>
+                <div className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="roleName">Role Name</Label>
+                      <Input id="roleName" name="roleName" placeholder="Enter role name" required />
                     </div>
-                    <Switch id="default-role" />
-                  </Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="roleDescription">Description</Label>
+                      <Input id="roleDescription" name="roleDescription" placeholder="Enter role description" required />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="baseRole">Base Role (Optional)</Label>
+                    <Select name="baseRole">
+                      <SelectTrigger id="baseRole">
+                        <SelectValue placeholder="Select a base role to copy permissions" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {roles.map((role) => (
+                          <SelectItem key={role.id} value={role.id}>
+                            {role.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Start with permissions from an existing role, or leave blank to start from scratch
+                    </p>
+                  </div>
                 </div>
-              </div>
+                <CardFooter className="px-0">
+                  <Button type="submit" className="ml-auto">Create Role</Button>
+                </CardFooter>
+              </form>
             </CardContent>
-            <CardFooter>
-              <Button className="ml-auto">Create Role</Button>
-            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
+      <CloneRoleDialog />
     </div>
   )
 }

@@ -16,9 +16,10 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
-import { supabase } from "@/lib/supabase/client"
 import { pusherClient, NOTIFICATION_CHANNELS, NOTIFICATION_EVENTS } from "@/lib/pusher"
 import { useAuth } from "@/hooks/use-auth"
+import { getTimeAgo, markNotificationAsRead, deleteNotification } from "@/lib/notifications/client"
+import { supabase } from "@/lib/supabase/client"
 
 // Mock notification data
 const mockNotifications = [
@@ -125,6 +126,7 @@ export default function AdminNotificationsPage() {
   // Fetch notifications from database
   const fetchNotifications = async () => {
     try {
+      setLoading(true)
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
@@ -192,70 +194,54 @@ export default function AdminNotificationsPage() {
     return matchesSearch && matchesType && matchesPriority
   })
 
-  const markAllAsRead = async () => {
+  const handleMarkAsRead = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ read: true, read_at: new Date().toISOString() })
-        .eq('recipient_id', user?.id)
-        .eq('read', false)
-
-      if (error) throw error
-
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-      toast('All notifications marked as read')
-    } catch (error) {
-      console.error('Error marking notifications as read:', error)
-      toast.error('Failed to mark notifications as read')
-    }
-  }
-
-  const markAsRead = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ read: true, read_at: new Date().toISOString() })
-        .eq('id', id)
-
-      if (error) throw error
-
-      setNotifications(prev =>
-        prev.map(n => (n.id === id ? { ...n, read: true } : n))
-      )
+      const result = await markNotificationAsRead(id, user?.id || '')
+      if (!result.success) throw new Error('Failed to mark notification as read')
+      toast.success('Notification marked as read')
     } catch (error) {
       console.error('Error marking notification as read:', error)
       toast.error('Failed to mark notification as read')
     }
   }
 
-  const deleteNotification = async (id: string) => {
+  const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('id', id)
-
-      if (error) throw error
-
-      setNotifications(prev => prev.filter(n => n.id !== id))
-      toast('Notification deleted')
+      const result = await deleteNotification(id, user?.id || '')
+      if (!result.success) throw new Error('Failed to delete notification')
+      toast.success('Notification deleted')
     } catch (error) {
       console.error('Error deleting notification:', error)
       toast.error('Failed to delete notification')
     }
   }
 
-  const clearAllNotifications = async () => {
+  const handleMarkAllAsRead = async () => {
     try {
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('recipient_id', user?.id)
+      const response = await fetch('/api/admin/notifications', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'markAllAsRead' })
+      })
 
-      if (error) throw error
+      if (!response.ok) throw new Error('Failed to mark all notifications as read')
+      toast.success('All notifications marked as read')
+      await fetchNotifications()
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error)
+      toast.error('Failed to mark all notifications as read')
+    }
+  }
 
+  const handleClearAll = async () => {
+    try {
+      const response = await fetch('/api/admin/notifications', {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) throw new Error('Failed to clear all notifications')
+      toast.success('All notifications cleared')
       setNotifications([])
-      toast('All notifications cleared')
     } catch (error) {
       console.error('Error clearing notifications:', error)
       toast.error('Failed to clear notifications')
@@ -270,11 +256,11 @@ export default function AdminNotificationsPage() {
           <p className="text-muted-foreground mt-1">Manage and view your system notifications</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={markAllAsRead} disabled={unreadCount === 0}>
+          <Button variant="outline" onClick={handleMarkAllAsRead} disabled={unreadCount === 0}>
             <Check className="mr-2 h-4 w-4" />
             Mark all as read
           </Button>
-          <Button variant="outline" onClick={clearAllNotifications} disabled={notifications.length === 0}>
+          <Button variant="outline" onClick={handleClearAll} disabled={notifications.length === 0}>
             <Trash2 className="mr-2 h-4 w-4" />
             Clear all
           </Button>
@@ -376,8 +362,8 @@ export default function AdminNotificationsPage() {
                         <NotificationItem
                           key={notification.id}
                           notification={notification}
-                          onMarkAsRead={markAsRead}
-                          onDelete={deleteNotification}
+                          onMarkAsRead={handleMarkAsRead}
+                          onDelete={handleDelete}
                         />
                       ))}
                     </div>
@@ -403,8 +389,8 @@ export default function AdminNotificationsPage() {
                           <NotificationItem
                             key={notification.id}
                             notification={notification}
-                            onMarkAsRead={markAsRead}
-                            onDelete={deleteNotification}
+                            onMarkAsRead={handleMarkAsRead}
+                            onDelete={handleDelete}
                           />
                         ))}
                     </div>
@@ -426,8 +412,8 @@ export default function AdminNotificationsPage() {
                           <NotificationItem
                             key={notification.id}
                             notification={notification}
-                            onMarkAsRead={markAsRead}
-                            onDelete={deleteNotification}
+                            onMarkAsRead={handleMarkAsRead}
+                            onDelete={handleDelete}
                           />
                         ))}
                     </div>
@@ -460,13 +446,14 @@ export default function AdminNotificationsPage() {
 
 interface NotificationItemProps {
   notification: {
-    id: number
+    id: string
     title: string
     message: string
-    time: string
+    created_at: string
     read: boolean
     type: string
     priority: string
+    metadata?: Record<string, any>
   }
   onMarkAsRead: (id: string) => void
   onDelete: (id: string) => void
@@ -506,15 +493,15 @@ function NotificationItem({ notification, onMarkAsRead, onDelete }: Notification
           </Badge>
         </div>
         <p className="text-sm text-muted-foreground">{notification.message}</p>
-        <p className="text-xs text-muted-foreground mt-1">{notification.time}</p>
+        <p className="text-xs text-muted-foreground mt-1">{getTimeAgo(notification.created_at)}</p>
       </div>
       <div className="flex gap-1">
         {!notification.read && (
-          <Button variant="ghost" size="icon" onClick={() => onMarkAsRead(notification.id.toString())} title="Mark as read">
+          <Button variant="ghost" size="icon" onClick={() => onMarkAsRead(notification.id)} title="Mark as read">
             <Check className="h-4 w-4" />
           </Button>
         )}
-        <Button variant="ghost" size="icon" onClick={() => onDelete(notification.id.toString())} title="Delete notification">
+        <Button variant="ghost" size="icon" onClick={() => onDelete(notification.id)} title="Delete notification">
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -524,23 +511,36 @@ function NotificationItem({ notification, onMarkAsRead, onDelete }: Notification
 
 function NotificationSettings() {
   const { user } = useAuth()
-  const [settings, setSettings] = useState<any>(null)
+  const [settings, setSettings] = useState<any>({
+    email_notifications: {
+      customer_registrations: 'all',
+      transaction_alerts: 'all',
+      system_alerts: 'all',
+      support_tickets: 'all'
+    },
+    push_notifications: {
+      enabled: 'enabled'
+    },
+    sms_notifications: {
+      critical_alerts: 'enabled'
+    }
+  })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    fetchSettings()
+    if (user?.id) {
+      fetchSettings()
+    }
   }, [user?.id])
 
   const fetchSettings = async () => {
     try {
-      const { data, error } = await supabase
-        .from('notification_settings')
-        .select('*')
-        .eq('user_id', user?.id)
-        .single()
-
-      if (error) throw error
-      setSettings(data)
+      const response = await fetch('/api/admin/notification-settings')
+      if (!response.ok) throw new Error('Failed to fetch notification settings')
+      const data = await response.json()
+      if (data) {
+        setSettings(data)
+      }
     } catch (error) {
       console.error('Error fetching notification settings:', error)
       toast.error('Failed to load notification settings')
@@ -550,16 +550,13 @@ function NotificationSettings() {
   const saveSettings = async () => {
     try {
       setSaving(true)
-      const { error } = await supabase
-        .from('notification_settings')
-        .upsert({
-          user_id: user?.id,
-          email_notifications: settings.email_notifications,
-          push_notifications: settings.push_notifications,
-          sms_notifications: settings.sms_notifications
-        })
+      const response = await fetch('/api/admin/notification-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      })
 
-      if (error) throw error
+      if (!response.ok) throw new Error('Failed to save notification settings')
       toast.success('Settings saved successfully')
     } catch (error) {
       console.error('Error saving notification settings:', error)

@@ -1,6 +1,5 @@
 import { supabase } from './client'
 import bcrypt from 'bcryptjs'
-import { sendVerificationEmail as sendEmail, sendPasswordResetEmail as sendResetEmail } from '@/lib/email'
 
 export type UserRole = 'customer' | 'admin'
 
@@ -32,10 +31,10 @@ export const customerSignUp = async (
           first_name: firstName,
           last_name: lastName,
           phone,
-          is_active: false,
-          email_verified: false,
-          verification_token: generateVerificationToken(),
-          verification_token_expires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+          is_active: true,
+          email_verified: true,
+          verification_token: null,
+          verification_token_expires: null
         }
       ])
       .select()
@@ -54,9 +53,6 @@ export const customerSignUp = async (
       ])
 
     if (walletError) throw walletError
-
-    // Send verification email
-    await sendVerificationEmail(customer.email, customer.verification_token)
 
     return {
       success: true,
@@ -85,10 +81,6 @@ export const customerLogin = async (
 
     if (!customer.is_active) {
       throw new Error('Account is inactive')
-    }
-
-    if (!customer.email_verified) {
-      throw new Error('Please verify your email before logging in')
     }
 
     // Compare password using bcrypt

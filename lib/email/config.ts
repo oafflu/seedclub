@@ -1,6 +1,6 @@
 import { MailDataRequired } from '@sendgrid/mail'
 
-export type EmailProvider = 'smtp' | 'sendgrid' | 'gmail' | 'microsoft'
+export type EmailProvider = 'smtp' | 'gmail' | 'microsoft'
 
 export interface EmailConfig {
   provider: EmailProvider
@@ -14,9 +14,6 @@ export interface EmailConfig {
       user: string
       pass: string
     }
-  }
-  sendgrid?: {
-    apiKey: string
   }
   gmail?: {
     clientId: string
@@ -46,9 +43,6 @@ export const emailConfig: EmailConfig = {
       user: process.env.SMTP_USER || '',
       pass: process.env.SMTP_PASS || ''
     }
-  } : undefined,
-  sendgrid: process.env.SENDGRID_API_KEY ? {
-    apiKey: process.env.SENDGRID_API_KEY
   } : undefined,
   gmail: process.env.GMAIL_CLIENT_ID ? {
     clientId: process.env.GMAIL_CLIENT_ID,

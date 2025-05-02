@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { AdminHeader } from "@/components/admin-header"
 import { AdminNav } from "@/components/admin-nav"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function AdminLayout({
   children,
@@ -14,17 +15,60 @@ export default function AdminLayout({
   const pathname = usePathname()
   const router = useRouter()
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
-    // Check if user is authenticated for admin section
-    const adminSession = localStorage.getItem("admin_session")
-    setIsAuthenticated(!!adminSession)
+    const checkAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error || !session) {
+          setIsAuthenticated(false)
+          if (pathname !== "/admin/login") {
+            router.push("/admin/login")
+          }
+          return
+        }
 
-    // If not on login page and not authenticated, redirect to login
-    if (pathname !== "/admin/login" && !adminSession) {
-      router.push("/admin/login")
+        // Check user role from metadata
+        const role = session.user?.user_metadata?.role
+        if (role !== 'admin' && role !== 'super_admin') {
+          await supabase.auth.signOut()
+          setIsAuthenticated(false)
+          if (pathname !== "/admin/login") {
+            router.push("/admin/login")
+          }
+          return
+        }
+
+        setIsAuthenticated(true)
+      } catch (error) {
+        console.error('Auth check error:', error)
+        setIsAuthenticated(false)
+        if (pathname !== "/admin/login") {
+          router.push("/admin/login")
+        }
+      }
     }
-  }, [pathname, router])
+
+    checkAuth()
+
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setIsAuthenticated(false)
+        if (pathname !== "/admin/login") {
+          router.push('/admin/login')
+        }
+      } else if (event === 'SIGNED_IN') {
+        checkAuth()
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [pathname, router, supabase])
 
   // Don't show the admin nav on the login page
   if (pathname === "/admin/login") {
@@ -33,7 +77,19 @@ export default function AdminLayout({
 
   // Show loading state while checking authentication
   if (isAuthenticated === null) {
-    return <div className="flex h-screen items-center justify-center">Loading...</div>
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold">Loading...</h2>
+          <p className="text-sm text-muted-foreground">Please wait while we check your authentication</p>
+        </div>
+      </div>
+    )
+  }
+
+  // If not authenticated, show nothing (will redirect)
+  if (!isAuthenticated) {
+    return null
   }
 
   // If authenticated, show the admin layout

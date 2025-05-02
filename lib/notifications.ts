@@ -1,6 +1,7 @@
 import { supabase } from './supabase/client'
 import { pusher } from './pusher'
 import { NOTIFICATION_CHANNELS, NOTIFICATION_EVENTS } from './pusher'
+import { supabaseAdmin } from './supabase/server'
 
 interface NotificationOptions {
   title: string
@@ -114,4 +115,65 @@ export async function deleteNotification(notificationId: string, userId: string)
     console.error('Error deleting notification:', error)
     throw error
   }
+}
+
+export type NotificationType = 'customer' | 'transaction' | 'system' | 'investment' | 'support' | 'kyc' | 'referral' | 'marketing'
+export type NotificationPriority = 'critical' | 'high' | 'medium' | 'low'
+
+export interface NotificationData {
+  title: string
+  message: string
+  type: NotificationType
+  priority: NotificationPriority
+  recipientId: string
+  metadata?: Record<string, any>
+}
+
+export async function createNotification(data: NotificationData) {
+  try {
+    // Save notification to database
+    const { error: dbError } = await supabaseAdmin
+      .from('notifications')
+      .insert({
+        recipient_id: data.recipientId,
+        title: data.title,
+        message: data.message,
+        type: data.type,
+        priority: data.priority,
+        read: false,
+        metadata: data.metadata,
+        created_at: new Date().toISOString()
+      })
+
+    if (dbError) throw dbError
+
+    // Send real-time notification via Pusher
+    await pusher.trigger(
+      `${NOTIFICATION_CHANNELS.ADMIN}-${data.recipientId}`,
+      NOTIFICATION_EVENTS.NEW,
+      {
+        ...data,
+        read: false,
+        created_at: new Date().toISOString()
+      }
+    )
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error creating notification:', error)
+    return { success: false, error }
+  }
+}
+
+// Helper function to get formatted time
+export function getTimeAgo(date: string | Date) {
+  const now = new Date()
+  const past = new Date(date)
+  const diffInSeconds = Math.floor((now.getTime() - past.getTime()) / 1000)
+
+  if (diffInSeconds < 60) return 'just now'
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`
+  return past.toLocaleDateString()
 } 

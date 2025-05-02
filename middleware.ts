@@ -1,3 +1,4 @@
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -43,6 +44,7 @@ const publicPaths = [
   '/api/auth/login',
   '/api/auth/register',
   '/admin/login',
+  '/mobile/login',
 ]
 
 // Admin paths that require admin authentication
@@ -51,78 +53,74 @@ const adminPaths = [
   '/api/admin',
 ]
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req, res })
+  
+  // Get the pathname
+  const path = req.nextUrl.pathname
 
-  // Allow public paths
-  if (publicPaths.some(path => pathname.startsWith(path))) {
-    return NextResponse.next()
+  // Check if the path is public
+  if (publicPaths.some(p => path.startsWith(p))) {
+    return res
+  }
+
+  // Get the session
+  const { data: { session } } = await supabase.auth.getSession()
+
+  // If no session and trying to access protected route
+  if (!session) {
+    if (path.startsWith('/admin/')) {
+      return NextResponse.redirect(new URL('/admin/login', req.url))
+    }
+    if (path.startsWith('/mobile/')) {
+      return NextResponse.redirect(new URL('/auth/login', req.url))
+    }
+    return res
   }
 
   // Handle admin routes
-  if (adminPaths.some(path => pathname.startsWith(path))) {
-    const adminToken = request.cookies.get('admin_token')
-    if (!adminToken && !pathname.startsWith('/admin/login')) {
-      return NextResponse.redirect(new URL('/admin/login', request.url))
+  if (path.startsWith('/admin/')) {
+    // Get user role from admin_users table
+    const { data: adminUser, error: adminError } = await supabase
+      .from('admin_users')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
+
+    if (adminError || !adminUser || !['admin', 'super_admin'].includes(adminUser.role)) {
+      return NextResponse.redirect(new URL('/admin/login', req.url))
     }
-
-    // Allow access to login page if no session
-    if (pathname === '/admin/login' && !adminToken) {
-      return NextResponse.next()
+    
+    // Check specific path permissions
+    const requiredRoles = protectedPaths[path as keyof typeof protectedPaths]
+    if (requiredRoles && !requiredRoles.includes(adminUser.role)) {
+      return NextResponse.redirect(new URL('/admin/dashboard', req.url))
     }
-
-    // Redirect to dashboard if already logged in and trying to access login page
-    if (pathname === '/admin/login' && adminToken) {
-      return NextResponse.redirect(new URL('/admin/dashboard', request.url))
-    }
-
-    // Check role-based access for protected admin paths
-    if (adminToken) {
-      const userRole = JSON.parse(adminToken.value).role
-      const requiredRoles = protectedPaths[pathname as keyof typeof protectedPaths]
-
-      if (requiredRoles && !requiredRoles.includes(userRole)) {
-        return NextResponse.redirect(new URL('/admin/dashboard', request.url))
-      }
-    }
-
-    return NextResponse.next()
   }
 
-  // Handle mobile (customer) routes
-  if (pathname.startsWith('/mobile')) {
-    const customerSession = request.cookies.get('customer_token')
+  // Handle mobile/customer routes
+  if (path.startsWith('/mobile/')) {
+    // Check if user exists in customers table
+    const { data: customer, error: customerError } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('id', session.user.id)
+      .single()
 
-    // Redirect to customer login if no session
-    if (!customerSession && !pathname.startsWith('/auth/')) {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
+    if (customerError || !customer) {
+      return NextResponse.redirect(new URL('/auth/login', req.url))
     }
-
-    // Check if email is verified for customer routes
-    if (customerSession) {
-      const session = JSON.parse(customerSession.value)
-      if (!session.email_verified && !pathname.startsWith('/auth/verify-email')) {
-        return NextResponse.redirect(new URL('/auth/verify-email', request.url))
-      }
-    }
-
-    return NextResponse.next()
   }
 
-  // Allow access to all other routes (marketing pages)
-  return NextResponse.next()
+  return res
 }
 
 // Configure which paths the middleware should run on
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public (public files)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|public|images).*)',
+    '/auth/:path*',
+    '/admin/:path*',
+    '/mobile/:path*',
   ],
 } 

@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -13,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { customerLogin } from "@/lib/supabase/auth"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -21,6 +19,7 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const router = useRouter()
   const { toast } = useToast()
+  const supabase = createClientComponentClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,34 +31,61 @@ export default function LoginPage() {
     const password = formData.get("password") as string
 
     try {
-      const { success, error: loginError, user } = await customerLogin(email, password)
+      // Sign in with Supabase auth
+      const { data: { session }, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
 
-      if (!success || loginError) {
-        throw new Error(loginError || 'Login failed')
+      if (signInError) throw signInError
+
+      if (!session) {
+        throw new Error('No session created')
       }
 
-      // Store session
-      localStorage.setItem('customer_session', JSON.stringify({
-        id: user.id,
-        email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name
-      }))
+      // Check if user exists in customers table
+      const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .select('id, is_active')
+        .eq('email', email)
+        .single()
+
+      if (customerError || !customer) {
+        await supabase.auth.signOut()
+        throw new Error('Invalid account type')
+      }
+
+      if (!customer.is_active) {
+        await supabase.auth.signOut()
+        throw new Error('Account is inactive')
+      }
+
+      // Update user metadata with role
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { role: 'customer' }
+      })
+
+      if (updateError) {
+        throw updateError
+      }
 
       toast({
         title: "Login successful",
-        description: `Welcome back, ${user.first_name}!`,
+        description: "Welcome back!",
       })
 
       // Redirect to customer dashboard
-      router.push("/mobile")
+      router.push("/mobile/dashboard")
     } catch (error: any) {
-      setError(error.message || "Invalid email or password. Please try again.")
+      console.error('Login error:', error)
+      setError(error.message || "Invalid email or password")
       toast({
         title: "Login failed",
         description: error.message || "Please check your credentials and try again.",
         variant: "destructive",
       })
+      // Sign out if there was an error
+      await supabase.auth.signOut()
     } finally {
       setIsLoading(false)
     }
@@ -74,8 +100,8 @@ export default function LoginPage() {
 
         <Card>
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl">Welcome back</CardTitle>
-            <CardDescription>Sign in to access your account</CardDescription>
+            <CardTitle className="text-2xl">Login</CardTitle>
+            <CardDescription>Sign in to your account</CardDescription>
           </CardHeader>
 
           {error && (
@@ -93,16 +119,19 @@ export default function LoginPage() {
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input id="email" name="email" type="email" placeholder="name@example.com" required className="pl-10" />
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="name@example.com"
+                    required
+                    className="pl-10"
+                  />
                 </div>
               </div>
+
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link href="/auth/forgot-password" className="text-sm hover:underline">
-                    Forgot password?
-                  </Link>
-                </div>
+                <Label htmlFor="password">Password</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -124,26 +153,29 @@ export default function LoginPage() {
                   </Button>
                 </div>
               </div>
+
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Signing in..." : "Sign in"}
               </Button>
             </form>
           </CardContent>
+
           <CardFooter className="flex flex-col space-y-4">
-            <div className="text-center text-sm">
-              Don&apos;t have an account?{" "}
-              <Link href="/auth/register" className="hover:underline">
-                Sign up
+            <div className="text-sm text-center space-y-2">
+              <Link 
+                href="/auth/forgot-password"
+                className="text-primary hover:underline"
+              >
+                Forgot password?
               </Link>
             </div>
-            <div className="text-center text-xs text-muted-foreground">
-              By signing in, you agree to our{" "}
-              <Link href="/terms" className="underline">
-                Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link href="/privacy" className="underline">
-                Privacy Policy
+            <div className="text-sm text-center">
+              Don't have an account?{" "}
+              <Link 
+                href="/auth/register"
+                className="text-primary hover:underline"
+              >
+                Sign up
               </Link>
             </div>
           </CardFooter>

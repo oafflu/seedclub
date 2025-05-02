@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function AdminLogin() {
   const router = useRouter()
@@ -17,6 +18,7 @@ export default function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const supabase = createClientComponentClient()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -24,23 +26,54 @@ export default function AdminLogin() {
     setLoading(true)
 
     try {
-      const response = await fetch('/api/auth/admin/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+      // Sign in with Supabase auth
+      const { data: { session }, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
       })
 
-      const data = await response.json()
+      if (signInError) throw signInError
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed')
+      if (!session) {
+        throw new Error('No session created')
       }
+
+      // Check if user exists in admin_users table
+      const { data: adminUser, error: adminError } = await supabase
+        .from('admin_users')
+        .select('id, role')
+        .eq('email', email)
+        .single()
+
+      if (adminError || !adminUser) {
+        await supabase.auth.signOut()
+        throw new Error('Unauthorized access')
+      }
+
+      // Update user metadata with role
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { role: adminUser.role || 'admin' }
+      })
+
+      if (updateError) {
+        throw updateError
+      }
+
+      // Log successful login
+      await supabase.from('audit_logs').insert({
+        user_id: session.user.id,
+        action: 'login',
+        user_type: 'admin',
+        ip_address: 'client_ip', // This will be handled by the server
+        user_agent: navigator.userAgent
+      })
 
       router.push('/admin/dashboard')
     } catch (err: any) {
-      setError(err.message)
+      console.error('Login error:', err)
+      setError(err.message || 'Invalid email or password')
+      // Sign out if there was an error
+      await supabase.auth.signOut()
     } finally {
       setLoading(false)
     }

@@ -3,28 +3,60 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowUpRight, Plus, TrendingUp, Wallet, History, Bell, Users, Sprout } from "lucide-react"
+import { ArrowUpRight, Plus, TrendingUp, Wallet, Bell, CircleDollarSign, HelpCircle, ChevronRight, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Slider } from "@/components/ui/slider"
+import Image from "next/image"
 
 export default function MobileDashboard() {
   const [userName, setUserName] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  const [sproutFundSimulation, setSproutFundSimulation] = useState({
+    currentProgress: 5,
+    simulatedProgress: 5,
+    currentProfit: 23.88,
+    projectedProfit: 23.88,
+    investedAmount: 5000,
+    growthRate: 10,
+  })
+
+  const [saplingStashSimulation, setSaplingStashSimulation] = useState({
+    currentProgress: 10,
+    simulatedProgress: 10,
+    currentProfit: 229.25,
+    projectedProfit: 229.25,
+    investedAmount: 10000,
+    growthRate: 12,
+  })
+
+  const [blossomBudgetSimulation, setBlossomBudgetSimulation] = useState({
+    currentProgress: 8,
+    simulatedProgress: 8,
+    currentProfit: 102.34,
+    projectedProfit: 102.34,
+    investedAmount: 3000,
+    growthRate: 15,
+  })
 
   useEffect(() => {
     // Check if user is authenticated
     const isAuthenticated = localStorage.getItem("isAuthenticated")
-    const storedUserName = localStorage.getItem("userName")
-
     if (!isAuthenticated) {
       router.push("/auth/login")
       return
     }
-
-    setUserName(storedUserName || "User")
+    
+    // Get user name from local storage or session
+    const storedUserName = localStorage.getItem("userName") || "User"
+    setUserName(storedUserName)
     setIsLoading(false)
   }, [router])
+
+  const calculateProjectedProfit = (amount: number, rate: number, progress: number) => {
+    return (amount * (rate / 100) * (progress / 100)).toFixed(2)
+  }
 
   if (isLoading) {
     return (
@@ -35,241 +67,487 @@ export default function MobileDashboard() {
   }
 
   return (
-    <div className="pb-20">
+    <div className="pb-20 bg-[#F5F5F5]">
       {/* Header */}
-      <div className="bg-primary/10 p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">Welcome back</p>
-            <h1 className="text-xl font-bold">{userName}</h1>
-          </div>
-          <Link href="/mobile/notifications">
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-white">
-                3
-              </span>
-            </Button>
-          </Link>
+      <div className="bg-[#F5F5F5] p-4">
+        <div>
+          <h1 className="text-[24px] font-semibold text-[#1A1A1A] mb-1">Hi {userName},</h1>
+          <p className="text-[14px] text-gray-600">Welcome back to your dashboard</p>
         </div>
 
-        {/* Balance Card */}
-        <Card className="mt-4">
-          <CardContent className="p-4">
+        {/* Account Balance Card */}
+        <Card className="mt-4 bg-white rounded-2xl shadow-sm">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Balance</p>
-                <p className="text-2xl font-bold">$12,450.00</p>
+                <p className="text-[15px] text-[#1A1A1A] font-medium mb-1">Account</p>
+                <p className="text-[32px] font-semibold tracking-tight mb-1">$ 3,750</p>
+                <p className="text-[14px] text-gray-600">Available Funds</p>
               </div>
-              <div className="flex flex-col items-end">
-                <div className="flex items-center text-green-600">
-                  <TrendingUp className="mr-1 h-4 w-4" />
-                  <span className="text-sm font-medium">+12.4%</span>
-                </div>
-                <p className="text-xs text-muted-foreground">This month</p>
+              <div className="text-right">
+                <Wallet className="h-5 w-5 text-gray-600 mb-1" />
+                <p className="text-[13px] text-gray-600">Wallet Balance</p>
               </div>
             </div>
-            <div className="mt-4 flex gap-2">
-              <Button asChild className="flex-1" size="sm">
-                <Link href="/mobile/wallet/add-funds">
-                  <Plus className="mr-1 h-4 w-4" /> Add Funds
-                </Link>
-              </Button>
-              <Button asChild variant="outline" className="flex-1" size="sm">
-                <Link href="/mobile/withdraw">
-                  <ArrowUpRight className="mr-1 h-4 w-4" /> Withdraw
-                </Link>
-              </Button>
+            <Button 
+              className="w-full mt-4 bg-[#F5F5F5] hover:bg-gray-200 text-[#1A1A1A] justify-center items-center h-[52px] text-[15px] font-medium gap-2"
+              asChild
+            >
+              <Link href="/mobile/wallet">
+                Go to Wallet
+                <ChevronRight className="h-5 w-5" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Profit Card */}
+        <Card className="mt-4 bg-white rounded-2xl shadow-sm">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[32px] font-semibold tracking-tight mb-1">$1,250</p>
+                <p className="text-[14px] text-gray-600">/ This year</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="text-right">
+                  <p className="text-[15px] text-[#1A1A1A] font-medium">Profit</p>
+                  <p className="text-[13px] text-gray-600">Total earnings</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-[#1B4242] flex items-center justify-center cursor-pointer hover:bg-[#153434]">
+                  <ChevronRight className="h-5 w-5 text-white" />
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Quick Actions */}
-      <div className="p-4">
-        <h2 className="mb-3 font-medium">Quick Actions</h2>
-        <div className="grid grid-cols-4 gap-2">
-          <Link href="/mobile/wallet" className="flex flex-col items-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-              <Wallet className="h-5 w-5 text-primary" />
-            </div>
-            <span className="mt-1 text-xs">Wallet</span>
-          </Link>
-          <Link href="/mobile/invest" className="flex flex-col items-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-              <Sprout className="h-5 w-5 text-green-600" />
-            </div>
-            <span className="mt-1 text-xs">Invest</span>
-          </Link>
-          <Link href="/mobile/history" className="flex flex-col items-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
-              <History className="h-5 w-5 text-blue-600" />
-            </div>
-            <span className="mt-1 text-xs">History</span>
-          </Link>
-          <Link href="/mobile/referrals" className="flex flex-col items-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-100">
-              <Users className="h-5 w-5 text-purple-600" />
-            </div>
-            <span className="mt-1 text-xs">Refer</span>
-          </Link>
-        </div>
-      </div>
+        {/* Jar Summary Section */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-[20px] font-semibold text-[#1A1A1A]">Jar Summary</h2>
+            <Link 
+              href="/mobile/jars" 
+              className="text-[14px] text-[#1A1A1A] flex items-center"
+            >
+              View all
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Link>
+          </div>
 
-      {/* Investment Jars */}
-      <div className="p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-medium">Your Investment Jars</h2>
-          <Link href="/mobile/jars" className="text-xs text-primary">
-            View All
-          </Link>
-        </div>
-
-        <div className="space-y-3">
-          <Card>
-            <CardContent className="p-3">
+          <Card className="bg-white rounded-2xl shadow-sm">
+            <CardContent className="p-5">
               <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                    <Sprout className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-[14px] text-gray-600 mb-1">Total Value</p>
+                  <p className="text-[32px] font-semibold tracking-tight">$19,040</p>
+                </div>
+                <Button 
+                  className="bg-[#1B4242] hover:bg-[#153434] text-white h-10 px-4 flex items-center gap-2"
+                >
+                  <Plus className="h-5 w-5" />
+                  New Jar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Your Jars Section */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-[20px] font-semibold text-[#1A1A1A]">Your Jars</h2>
+            <p className="text-[14px] text-gray-600">Drag to simulate growth</p>
+          </div>
+
+          {/* Sprout Fund Jar */}
+          <Card className="bg-white rounded-[20px] shadow-sm overflow-hidden">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 relative">
+                    <Image 
+                      src="/assets/icons/sprout-jar.svg" 
+                      alt="Sprout Fund" 
+                      width={20} 
+                      height={20}
+                    />
                   </div>
-                  <div>
-                    <p className="font-medium">10% Growth Jar</p>
-                    <p className="text-xs text-muted-foreground">12 months • Matures Dec 2025</p>
+                  <span className="text-[16px] font-medium text-gray-900">Sprout Fund</span>
+                </div>
+                <div className="bg-[#ECFDF3] px-2.5 py-1 rounded-full">
+                  <p className="text-[13px] text-[#039855] font-medium flex items-center gap-1">
+                    <span className="text-lg">↗</span> 10% Growth for 12 months
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <p className="text-[13px] text-gray-500 mb-1">Amount Invested</p>
+                  <p className="text-[20px] font-semibold text-gray-900">$5,000</p>
+                </div>
+                <div>
+                  <p className="text-[13px] text-gray-500 mb-1">Maturity Date</p>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <p className="text-[15px] text-gray-900">Dec 15, 2025</p>
                   </div>
                 </div>
-                <div className="text-right">
+              </div>
+
+              <div className="mb-4">
+                <div className="flex justify-between text-[13px] mb-2">
+                  <span className="text-gray-600">Maturity Progress</span>
+                  <span className="text-gray-600">{sproutFundSimulation.currentProgress}% Complete</span>
+                </div>
+                <div className="relative">
+                  <div className="h-[4px] w-full bg-gray-200 rounded-full">
+                    <div 
+                      className="absolute top-0 left-0 h-[4px] bg-[#1B4242] rounded-full" 
+                      style={{ width: `${sproutFundSimulation.currentProgress}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <div className="flex justify-between text-[13px] mb-2">
+                  <span className="text-gray-600">Current: {sproutFundSimulation.currentProgress}%</span>
+                  <span className="text-gray-600">Simulated: {sproutFundSimulation.simulatedProgress}%</span>
+                </div>
+                <div className="relative h-4 flex items-center">
+                  <div 
+                    className="absolute top-[6px] left-0 h-1 bg-[#1B4242] rounded-full" 
+                    style={{ width: `${sproutFundSimulation.currentProgress}%` }}
+                  />
+                  <Slider
+                    defaultValue={[sproutFundSimulation.currentProgress]}
+                    max={100}
+                    step={1}
+                    className="absolute w-full"
+                    onValueChange={(value) => {
+                      const simulatedValue = value[0]
+                      const projectedProfit = calculateProjectedProfit(
+                        sproutFundSimulation.investedAmount,
+                        sproutFundSimulation.growthRate,
+                        simulatedValue
+                      )
+                      setSproutFundSimulation(prev => ({
+                        ...prev,
+                        simulatedProgress: simulatedValue,
+                        projectedProfit: Number(projectedProfit)
+                      }))
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[13px] text-gray-500 mb-1">Current Profit</p>
+                  <p className="text-[15px] text-[#039855] font-medium">
+                    +${sproutFundSimulation.currentProfit.toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[13px] text-gray-500 mb-1">Projected Profit</p>
+                  <p className="text-[15px] text-[#039855] font-medium">
+                    +${sproutFundSimulation.projectedProfit.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Sapling Stash Jar */}
+          <Card className="bg-white rounded-[20px] shadow-sm overflow-hidden mt-4">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 relative">
+                    <Image 
+                      src="/assets/icons/sapling-jar.svg" 
+                      alt="Sapling Stash" 
+                      width={20} 
+                      height={20}
+                    />
+                  </div>
+                  <span className="text-[16px] font-medium text-gray-900">Sapling Stash</span>
+                </div>
+                <div className="bg-[#ECFDF3] px-2.5 py-1 rounded-full">
+                  <p className="text-[13px] text-[#039855] font-medium flex items-center gap-1">
+                    <span className="text-lg">↗</span> 12% Growth for 24 months
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <p className="text-[13px] text-gray-500 mb-1">Amount Invested</p>
+                  <p className="text-[20px] font-semibold text-gray-900">$10,000</p>
+                </div>
+                <div>
+                  <p className="text-[13px] text-gray-500 mb-1">Maturity Date</p>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <p className="text-[15px] text-gray-900">Jan 15, 2026</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <div className="flex justify-between text-[13px] mb-2">
+                  <span className="text-gray-600">Maturity Progress</span>
+                  <span className="text-gray-600">{saplingStashSimulation.currentProgress}% Complete</span>
+                </div>
+                <div className="relative">
+                  <div className="h-[4px] w-full bg-gray-200 rounded-full">
+                    <div 
+                      className="absolute top-0 left-0 h-[4px] bg-[#1B4242] rounded-full" 
+                      style={{ width: `${saplingStashSimulation.currentProgress}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <div className="flex justify-between text-[13px] mb-2">
+                  <span className="text-gray-600">Current: {saplingStashSimulation.currentProgress}%</span>
+                  <span className="text-gray-600">Simulated: {saplingStashSimulation.simulatedProgress}%</span>
+                </div>
+                <div className="relative h-4 flex items-center">
+                  <div 
+                    className="absolute top-[6px] left-0 h-1 bg-[#1B4242] rounded-full" 
+                    style={{ width: `${saplingStashSimulation.currentProgress}%` }}
+                  />
+                  <Slider
+                    defaultValue={[saplingStashSimulation.currentProgress]}
+                    max={100}
+                    step={1}
+                    className="absolute w-full"
+                    onValueChange={(value) => {
+                      const simulatedValue = value[0]
+                      const projectedProfit = calculateProjectedProfit(
+                        saplingStashSimulation.investedAmount,
+                        saplingStashSimulation.growthRate,
+                        simulatedValue
+                      )
+                      setSaplingStashSimulation(prev => ({
+                        ...prev,
+                        simulatedProgress: simulatedValue,
+                        projectedProfit: Number(projectedProfit)
+                      }))
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[13px] text-gray-500 mb-1">Current Profit</p>
+                  <p className="text-[15px] text-[#039855] font-medium">
+                    +${saplingStashSimulation.currentProfit.toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[13px] text-gray-500 mb-1">Projected Profit</p>
+                  <p className="text-[15px] text-[#039855] font-medium">
+                    +${saplingStashSimulation.projectedProfit.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Blossom Budget Jar */}
+          <Card className="bg-white rounded-[20px] shadow-sm overflow-hidden mt-4">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 relative">
+                    <Image 
+                      src="/assets/icons/blossom-jar.svg" 
+                      alt="Blossom Budget" 
+                      width={20} 
+                      height={20}
+                    />
+                  </div>
+                  <span className="text-[16px] font-medium text-gray-900">Blossom Budget</span>
+                </div>
+                <div className="bg-[#ECFDF3] px-2.5 py-1 rounded-full">
+                  <p className="text-[13px] text-[#039855] font-medium flex items-center gap-1">
+                    <span className="text-lg">↗</span> 15% Growth for 36 months
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <p className="text-[13px] text-gray-500 mb-1">Amount Invested</p>
+                  <p className="text-[20px] font-semibold text-gray-900">$3,000</p>
+                </div>
+                <div>
+                  <p className="text-[13px] text-gray-500 mb-1">Maturity Date</p>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <p className="text-[15px] text-gray-900">Feb 15, 2027</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <div className="flex justify-between text-[13px] mb-2">
+                  <span className="text-gray-600">Maturity Progress</span>
+                  <span className="text-gray-600">{blossomBudgetSimulation.currentProgress}% Complete</span>
+                </div>
+                <div className="relative">
+                  <div className="h-[4px] w-full bg-gray-200 rounded-full">
+                    <div 
+                      className="absolute top-0 left-0 h-[4px] bg-[#1B4242] rounded-full" 
+                      style={{ width: `${blossomBudgetSimulation.currentProgress}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <div className="flex justify-between text-[13px] mb-2">
+                  <span className="text-gray-600">Current: {blossomBudgetSimulation.currentProgress}%</span>
+                  <span className="text-gray-600">Simulated: {blossomBudgetSimulation.simulatedProgress}%</span>
+                </div>
+                <div className="relative h-4 flex items-center">
+                  <div 
+                    className="absolute top-[6px] left-0 h-1 bg-[#1B4242] rounded-full" 
+                    style={{ width: `${blossomBudgetSimulation.currentProgress}%` }}
+                  />
+                  <Slider
+                    defaultValue={[blossomBudgetSimulation.currentProgress]}
+                    max={100}
+                    step={1}
+                    className="absolute w-full"
+                    onValueChange={(value) => {
+                      const simulatedValue = value[0]
+                      const projectedProfit = calculateProjectedProfit(
+                        blossomBudgetSimulation.investedAmount,
+                        blossomBudgetSimulation.growthRate,
+                        simulatedValue
+                      )
+                      setBlossomBudgetSimulation(prev => ({
+                        ...prev,
+                        simulatedProgress: simulatedValue,
+                        projectedProfit: Number(projectedProfit)
+                      }))
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[13px] text-gray-500 mb-1">Current Profit</p>
+                  <p className="text-[15px] text-[#039855] font-medium">
+                    +${blossomBudgetSimulation.currentProfit.toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[13px] text-gray-500 mb-1">Projected Profit</p>
+                  <p className="text-[15px] text-[#039855] font-medium">
+                    +${blossomBudgetSimulation.projectedProfit.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mt-6">
+          <h2 className="text-[20px] font-semibold text-[#1A1A1A] mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-4 gap-4">
+            <Link href="/mobile/wallet/add-funds" className="flex flex-col items-center">
+              <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center mb-2">
+                <CircleDollarSign className="h-6 w-6 text-blue-600" />
+              </div>
+              <span className="text-xs text-gray-600">Add Funds</span>
+            </Link>
+            <Link href="/mobile/jars/create" className="flex flex-col items-center">
+              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mb-2">
+                <Plus className="h-6 w-6 text-green-600" />
+              </div>
+              <span className="text-xs text-gray-600">Create Jar</span>
+            </Link>
+            <Link href="/mobile/withdraw" className="flex flex-col items-center">
+              <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center mb-2">
+                <ArrowUpRight className="h-6 w-6 text-purple-600" />
+              </div>
+              <span className="text-xs text-gray-600">Withdraw</span>
+            </Link>
+            <Link href="/mobile/support" className="flex flex-col items-center">
+              <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center mb-2">
+                <HelpCircle className="h-6 w-6 text-orange-600" />
+              </div>
+              <span className="text-xs text-gray-600">Support</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Recent Transactions */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-[20px] font-semibold text-[#1A1A1A]">Recent Transactions</h2>
+            <Link href="/mobile/history" className="text-[14px] text-[#1A1A1A] flex items-center">
+              View all
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Link>
+          </div>
+          <Card>
+            <CardContent className="p-0">
+              <div className="border-b p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
+                      <Plus className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Added funds to wallet</p>
+                      <p className="text-xs text-gray-600">2023-12-15</p>
+                    </div>
+                  </div>
+                  <p className="font-medium text-green-600">+$2,000</p>
+                </div>
+              </div>
+              <div className="border-b p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
+                      <Plus className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Created Jar</p>
+                      <p className="text-xs text-gray-600">2023-12-10</p>
+                    </div>
+                  </div>
                   <p className="font-medium">$5,000</p>
-                  <p className="text-xs text-green-600">+$125.00</p>
                 </div>
               </div>
-              <div className="mt-3">
-                <div className="mb-1 flex justify-between text-xs">
-                  <span>Progress</span>
-                  <span>25%</span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div className="h-full bg-primary" style={{ width: "25%" }}></div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
-                    <Sprout className="h-5 w-5 text-green-600" />
+              <div className="p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Jar earnings</p>
+                      <p className="text-xs text-gray-600">2024-01-15</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">12% Growth Jar</p>
-                    <p className="text-xs text-muted-foreground">24 months • Matures Mar 2027</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-medium">$3,500</p>
-                  <p className="text-xs text-green-600">+$105.00</p>
-                </div>
-              </div>
-              <div className="mt-3">
-                <div className="mb-1 flex justify-between text-xs">
-                  <span>Progress</span>
-                  <span>15%</span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div className="h-full bg-green-600" style={{ width: "15%" }}></div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-                    <Sprout className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium">15% Growth Jar</p>
-                    <p className="text-xs text-muted-foreground">36 months • Matures Mar 2028</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-medium">$2,000</p>
-                  <p className="text-xs text-green-600">+$75.00</p>
-                </div>
-              </div>
-              <div className="mt-3">
-                <div className="mb-1 flex justify-between text-xs">
-                  <span>Progress</span>
-                  <span>8%</span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div className="h-full bg-blue-600" style={{ width: "8%" }}></div>
+                  <p className="font-medium text-green-600">+$250</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
-      </div>
-
-      {/* Recent Transactions */}
-      <div className="p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-medium">Recent Transactions</h2>
-          <Link href="/mobile/history" className="text-xs text-primary">
-            View All
-          </Link>
-        </div>
-
-        <Card>
-          <CardContent className="p-0">
-            <div className="border-b p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
-                    <Plus className="h-4 w-4 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Deposit</p>
-                    <p className="text-xs text-muted-foreground">Apr 15, 2025</p>
-                  </div>
-                </div>
-                <p className="font-medium text-green-600">+$1,000.00</p>
-              </div>
-            </div>
-            <div className="border-b p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                    <Sprout className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium">New Investment</p>
-                    <p className="text-xs text-muted-foreground">Apr 12, 2025</p>
-                  </div>
-                </div>
-                <p className="font-medium text-muted-foreground">-$2,000.00</p>
-              </div>
-            </div>
-            <div className="p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
-                    <ArrowUpRight className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Withdrawal</p>
-                    <p className="text-xs text-muted-foreground">Apr 5, 2025</p>
-                  </div>
-                </div>
-                <p className="font-medium text-muted-foreground">-$500.00</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   )

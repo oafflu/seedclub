@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Save, RefreshCw, CheckCircle, Lock, Mail, Bell, DollarSign, Percent, Clock, CreditCard, Shield } from "lucide-react"
+import { Save, RefreshCw, CheckCircle, Lock, Mail, Bell, DollarSign, Percent, Clock, CreditCard, Shield, Loader2, TestTube, BellRing } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -14,10 +14,21 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { toast } from "sonner"
+import { usePusher } from '@/hooks/use-pusher'
+
+interface GmailConfig {
+  enabled: boolean
+  clientId: string
+  clientSecret: string
+  refreshToken: string
+  user: string
+}
 
 export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
+  const [testingConnection, setTestingConnection] = useState(false)
+  const [sendingTestNotification, setSendingTestNotification] = useState(false)
 
   // Stripe configuration state
   const [stripeConfig, setStripeConfig] = useState({
@@ -30,12 +41,6 @@ export default function SettingsPage() {
       ach: false,
       sepa: false
     }
-  })
-
-  // SendGrid configuration state
-  const [sendGridConfig, setSendGridConfig] = useState({
-    enabled: true,
-    apiKey: process.env.SENDGRID_API_KEY || ''
   })
 
   // Twilio configuration state
@@ -53,19 +58,33 @@ export default function SettingsPage() {
     secretKey: process.env.RECAPTCHA_SECRET_KEY || ''
   })
 
+  // SMTP configuration state
+  const [smtpConfig, setSmtpConfig] = useState({
+    enabled: process.env.SMTP_ENABLED === 'true',
+    host: process.env.SMTP_HOST || '',
+    port: process.env.SMTP_PORT || '587',
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || ''
+  })
+
   // Gmail configuration state
-  const [gmailConfig, setGmailConfig] = useState({
-    enabled: false,
-    email: '',
-    appPassword: ''
+  const [gmailConfig, setGmailConfig] = useState<GmailConfig>({
+    enabled: process.env.GMAIL_ENABLED === 'true',
+    clientId: process.env.GMAIL_CLIENT_ID || '',
+    clientSecret: process.env.GMAIL_CLIENT_SECRET || '',
+    refreshToken: process.env.GMAIL_REFRESH_TOKEN || '',
+    user: process.env.GMAIL_USER || ''
   })
 
   // Microsoft configuration state
   const [microsoftConfig, setMicrosoftConfig] = useState({
-    enabled: false,
-    clientId: '',
-    clientSecret: '',
-    tenantId: ''
+    enabled: process.env.MICROSOFT_ENABLED === 'true',
+    clientId: process.env.MICROSOFT_CLIENT_ID || '',
+    clientSecret: process.env.MICROSOFT_CLIENT_SECRET || '',
+    refreshToken: process.env.MICROSOFT_REFRESH_TOKEN || '',
+    user: process.env.MICROSOFT_USER || '',
+    tenantId: process.env.MICROSOFT_TENANT_ID || ''
   })
 
   // Add Pusher configuration state
@@ -76,6 +95,9 @@ export default function SettingsPage() {
     secret: process.env.PUSHER_SECRET || '',
     cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || ''
   })
+
+  // Initialize Pusher client for test notifications
+  usePusher(pusherConfig)
 
   const handleStripeChange = (field: string, value: any) => {
     setStripeConfig(prev => ({
@@ -94,13 +116,6 @@ export default function SettingsPage() {
     }))
   }
 
-  const handleSendGridChange = (field: string, value: any) => {
-    setSendGridConfig(prev => ({
-      ...prev,
-      [field]: value
-    }))
-  }
-
   const handleTwilioChange = (field: string, value: any) => {
     setTwilioConfig(prev => ({
       ...prev,
@@ -110,6 +125,13 @@ export default function SettingsPage() {
 
   const handleRecaptchaChange = (field: string, value: any) => {
     setRecaptchaConfig(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleSMTPChange = (field: string, value: any) => {
+    setSmtpConfig(prev => ({
       ...prev,
       [field]: value
     }))
@@ -136,64 +158,207 @@ export default function SettingsPage() {
     }))
   }
 
-  const handleSaveStripeSettings = async () => {
+  const handleTestPusherConnection = async () => {
     try {
-      setSaving(true)
-      // Here you would typically make an API call to save the settings
-      // For example:
-      // await fetch('/api/admin/settings/stripe', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(stripeConfig)
-      // })
+      setTestingConnection(true)
+      const response = await fetch('/api/admin/settings/pusher/test/connection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pusherConfig)
+      })
+
+      const data = await response.json()
       
-      toast.success('Stripe settings saved successfully')
-      setSavedSuccess(true)
-      setTimeout(() => setSavedSuccess(false), 3000)
+      if (data.success) {
+        toast.success('Pusher connection test successful', {
+          description: 'Your Pusher credentials are valid and working.'
+        })
+      } else {
+        throw new Error(data.error || 'Connection test failed')
+      }
     } catch (error) {
-      console.error('Error saving Stripe settings:', error)
-      toast.error('Failed to save Stripe settings')
+      console.error('Pusher connection test failed:', error)
+      toast.error('Pusher connection test failed', {
+        description: error instanceof Error ? error.message : 'Failed to test Pusher connection'
+      })
     } finally {
-      setSaving(false)
+      setTestingConnection(false)
+    }
+  }
+
+  const handleSendTestNotification = async () => {
+    try {
+      setSendingTestNotification(true)
+      const response = await fetch('/api/admin/settings/pusher/test/notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pusherConfig)
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        toast.success('Test notification sent', {
+          description: 'Check your Pusher debug console to see the test event.'
+        })
+      } else {
+        throw new Error(data.error || 'Failed to send test notification')
+      }
+    } catch (error) {
+      console.error('Failed to send test notification:', error)
+      toast.error('Failed to send test notification', {
+        description: error instanceof Error ? error.message : 'Could not send test notification'
+      })
+    } finally {
+      setSendingTestNotification(false)
     }
   }
 
   const handleSaveIntegrations = async () => {
     try {
       setSaving(true)
-      // Here you would typically make API calls to save all integration settings
-      // await Promise.all([
-      //   fetch('/api/admin/settings/sendgrid', { method: 'POST', body: JSON.stringify(sendGridConfig) }),
-      //   fetch('/api/admin/settings/gmail', { method: 'POST', body: JSON.stringify(gmailConfig) }),
-      //   fetch('/api/admin/settings/microsoft', { method: 'POST', body: JSON.stringify(microsoftConfig) }),
-      //   fetch('/api/admin/settings/twilio', { method: 'POST', body: JSON.stringify(twilioConfig) }),
-      //   fetch('/api/admin/settings/pusher', { method: 'POST', body: JSON.stringify(pusherConfig) }),
-      //   fetch('/api/admin/settings/recaptcha', { method: 'POST', body: JSON.stringify(recaptchaConfig) })
-      // ])
       
-      toast.success('Integration settings saved successfully')
+      // Save Pusher settings
+      const pusherResponse = await fetch('/api/admin/settings/pusher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pusherConfig)
+      })
+
+      if (!pusherResponse.ok) {
+        const error = await pusherResponse.json()
+        throw new Error(error.message || 'Failed to save Pusher settings')
+      }
+
+      // Show success message for Pusher settings
+      toast.success('Pusher settings saved successfully', {
+        description: 'Your real-time notification settings have been updated.'
+      })
+
+      // Save other integration settings
+      await Promise.all([
+        fetch('/api/admin/settings/twilio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(twilioConfig)
+        }).then(res => {
+          if (res.ok) {
+            toast.success('Twilio settings saved successfully', {
+              description: 'Your SMS notification settings have been updated.'
+            })
+          }
+          return res
+        }),
+        fetch('/api/admin/settings/recaptcha', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(recaptchaConfig)
+        }).then(res => {
+          if (res.ok) {
+            toast.success('reCAPTCHA settings saved successfully', {
+              description: 'Your bot protection settings have been updated.'
+            })
+          }
+          return res
+        })
+      ])
+
       setSavedSuccess(true)
       setTimeout(() => setSavedSuccess(false), 3000)
     } catch (error) {
       console.error('Error saving integration settings:', error)
-      toast.error('Failed to save integration settings')
+      toast.error(error instanceof Error ? error.message : 'Failed to save integration settings', {
+        description: 'Please try again or contact support if the issue persists.'
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveStripeSettings = async () => {
+    try {
+      setSaving(true)
+      const response = await fetch('/api/admin/settings/stripe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(stripeConfig)
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to save Stripe settings')
+      }
+      
+      toast.success('Stripe settings saved successfully', {
+        description: 'Your payment gateway settings have been updated.'
+      })
+      setSavedSuccess(true)
+      setTimeout(() => setSavedSuccess(false), 3000)
+    } catch (error) {
+      console.error('Error saving Stripe settings:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to save Stripe settings', {
+        description: 'Please try again or contact support if the issue persists.'
+      })
     } finally {
       setSaving(false)
     }
   }
 
   const handleSave = async () => {
-    setSaving(true)
     try {
-      // Save all settings including Stripe
-      await handleSaveStripeSettings()
-      // Add other settings save logic here
-      
+      setSaving(true)
+      const responses = await Promise.all([
+        fetch('/api/admin/settings/smtp', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(smtpConfig) 
+        }).then(res => {
+          if (res.ok) {
+            toast.success('SMTP settings saved successfully', {
+              description: 'Your email server settings have been updated.'
+            })
+          }
+          return res
+        }),
+        fetch('/api/admin/settings/gmail', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(gmailConfig) 
+        }).then(res => {
+          if (res.ok) {
+            toast.success('Gmail settings saved successfully', {
+              description: 'Your Gmail integration settings have been updated.'
+            })
+          }
+          return res
+        }),
+        fetch('/api/admin/settings/microsoft', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(microsoftConfig) 
+        }).then(res => {
+          if (res.ok) {
+            toast.success('Microsoft settings saved successfully', {
+              description: 'Your Microsoft 365 integration settings have been updated.'
+            })
+          }
+          return res
+        })
+      ])
+
+      // Check if any requests failed
+      const failedRequests = responses.filter(res => !res.ok)
+      if (failedRequests.length > 0) {
+        throw new Error('Some settings failed to save')
+      }
+
       setSavedSuccess(true)
       setTimeout(() => setSavedSuccess(false), 3000)
     } catch (error) {
       console.error('Error saving settings:', error)
-      toast.error('Failed to save settings')
+      toast.error(error instanceof Error ? error.message : 'Failed to save settings', {
+        description: 'Please try again or contact support if the issue persists.'
+      })
     } finally {
       setSaving(false)
     }
@@ -983,127 +1148,157 @@ export default function SettingsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Third-Party Integrations</CardTitle>
-              <CardDescription>Configure integrations with third-party services</CardDescription>
+              <CardTitle>SMTP Configuration</CardTitle>
+              <CardDescription>Configure SMTP settings for sending emails</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-md bg-primary/10 p-2">
-                      <Mail className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-medium">SendGrid</h3>
-                      <p className="text-sm text-muted-foreground">Email delivery service</p>
-                    </div>
-                  </div>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="smtp-enabled"
+                  checked={smtpConfig.enabled}
+                  onCheckedChange={(checked) => handleSMTPChange('enabled', checked)}
+                />
+                <Label htmlFor="smtp-enabled">Enable SMTP</Label>
+              </div>
+
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="smtp-host">SMTP Host</Label>
+                  <Input
+                    id="smtp-host"
+                    value={smtpConfig.host}
+                    onChange={(e) => handleSMTPChange('host', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="smtp-port">SMTP Port</Label>
+                  <Input
+                    id="smtp-port"
+                    type="number"
+                    value={smtpConfig.port}
+                    onChange={(e) => handleSMTPChange('port', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="smtp-secure">Use SSL/TLS</Label>
                   <Switch
-                    id="sendgrid-enabled"
-                    checked={sendGridConfig.enabled}
-                    onCheckedChange={(checked) => handleSendGridChange('enabled', checked)}
+                    id="smtp-secure"
+                    checked={smtpConfig.secure}
+                    onCheckedChange={(checked) => handleSMTPChange('secure', checked)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="smtp-user">Username</Label>
+                  <Input
+                    id="smtp-user"
+                    value={smtpConfig.user}
+                    onChange={(e) => handleSMTPChange('user', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="smtp-pass">Password</Label>
+                  <Input
+                    id="smtp-pass"
+                    type="password"
+                    value={smtpConfig.pass}
+                    onChange={(e) => handleSMTPChange('pass', e.target.value)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Gmail Configuration</CardTitle>
+              <CardDescription>Configure Gmail API settings for sending emails</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="gmail-enabled"
+                  checked={gmailConfig.enabled}
+                  onCheckedChange={(checked) => handleGmailChange('enabled', checked)}
+                />
+                <Label htmlFor="gmail-enabled">Enable Gmail</Label>
+              </div>
+
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="gmail-client-id">Client ID</Label>
+                  <Input
+                    id="gmail-client-id"
+                    value={gmailConfig.clientId}
+                    onChange={(e) => handleGmailChange('clientId', e.target.value)}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="sendgrid-api-key">API Key</Label>
+                  <Label htmlFor="gmail-client-secret">Client Secret</Label>
                   <Input
-                    id="sendgrid-api-key"
+                    id="gmail-client-secret"
                     type="password"
-                    value={sendGridConfig.apiKey}
-                    onChange={(e) => handleSendGridChange('apiKey', e.target.value)}
-                    placeholder="SG..."
+                    value={gmailConfig.clientSecret}
+                    onChange={(e) => handleGmailChange('clientSecret', e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="gmail-refresh-token">Refresh Token</Label>
+                  <Input
+                    id="gmail-refresh-token"
+                    type="password"
+                    value={gmailConfig.refreshToken}
+                    onChange={(e) => handleGmailChange('refreshToken', e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="gmail-user">Gmail Address</Label>
+                  <Input
+                    id="gmail-user"
+                    type="email"
+                    value={gmailConfig.user}
+                    onChange={(e) => handleGmailChange('user', e.target.value)}
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
-              <Separator />
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-md bg-primary/10 p-2">
-                      <Mail className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-medium">Gmail</h3>
-                      <p className="text-sm text-muted-foreground">Gmail SMTP service</p>
-                    </div>
-                  </div>
-                  <Switch
-                    id="gmail-enabled"
-                    checked={gmailConfig.enabled}
-                    onCheckedChange={(checked) => handleGmailChange('enabled', checked)}
-                  />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="gmail-email">Gmail Address</Label>
-                    <Input
-                      id="gmail-email"
-                      type="email"
-                      value={gmailConfig.email}
-                      onChange={(e) => handleGmailChange('email', e.target.value)}
-                      placeholder="your-email@gmail.com"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="gmail-app-password">App Password</Label>
-                    <Input
-                      id="gmail-app-password"
-                      type="password"
-                      value={gmailConfig.appPassword}
-                      onChange={(e) => handleGmailChange('appPassword', e.target.value)}
-                      placeholder="16-character app password"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Generate an App Password from your Google Account settings
-                    </p>
-                  </div>
-                </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Microsoft Configuration</CardTitle>
+              <CardDescription>Configure Microsoft 365 API settings for sending emails</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="microsoft-enabled"
+                  checked={microsoftConfig.enabled}
+                  onCheckedChange={(checked) => handleMicrosoftChange('enabled', checked)}
+                />
+                <Label htmlFor="microsoft-enabled">Enable Microsoft 365</Label>
               </div>
 
-              <Separator />
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-md bg-primary/10 p-2">
-                      <Mail className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-medium">Microsoft 365</h3>
-                      <p className="text-sm text-muted-foreground">Microsoft 365 email service</p>
-                    </div>
-                  </div>
-                  <Switch
-                    id="microsoft-enabled"
-                    checked={microsoftConfig.enabled}
-                    onCheckedChange={(checked) => handleMicrosoftChange('enabled', checked)}
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="microsoft-client-id">Client ID</Label>
+                  <Input
+                    id="microsoft-client-id"
+                    value={microsoftConfig.clientId}
+                    onChange={(e) => handleMicrosoftChange('clientId', e.target.value)}
                   />
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="microsoft-client-id">Client ID</Label>
-                    <Input
-                      id="microsoft-client-id"
-                      value={microsoftConfig.clientId}
-                      onChange={(e) => handleMicrosoftChange('clientId', e.target.value)}
-                      placeholder="Enter Azure AD Client ID"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="microsoft-client-secret">Client Secret</Label>
-                    <Input
-                      id="microsoft-client-secret"
-                      type="password"
-                      value={microsoftConfig.clientSecret}
-                      onChange={(e) => handleMicrosoftChange('clientSecret', e.target.value)}
-                      placeholder="Enter Azure AD Client Secret"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="microsoft-client-secret">Client Secret</Label>
+                  <Input
+                    id="microsoft-client-secret"
+                    type="password"
+                    value={microsoftConfig.clientSecret}
+                    onChange={(e) => handleMicrosoftChange('clientSecret', e.target.value)}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -1112,51 +1307,45 @@ export default function SettingsPage() {
                     id="microsoft-tenant-id"
                     value={microsoftConfig.tenantId}
                     onChange={(e) => handleMicrosoftChange('tenantId', e.target.value)}
-                    placeholder="Enter Azure AD Tenant ID"
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
-              <Separator />
+          <Card>
+            <CardHeader>
+              <CardTitle>Twilio Configuration</CardTitle>
+              <CardDescription>Configure Twilio API settings for sending SMS notifications</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="twilio-enabled"
+                  checked={twilioConfig.enabled}
+                  onCheckedChange={(checked) => handleTwilioChange('enabled', checked)}
+                />
+                <Label htmlFor="twilio-enabled">Enable Twilio</Label>
+              </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-md bg-primary/10 p-2">
-                      <Bell className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-medium">Twilio</h3>
-                      <p className="text-sm text-muted-foreground">SMS notification service</p>
-                    </div>
-                  </div>
-                  <Switch
-                    id="twilio-enabled"
-                    checked={twilioConfig.enabled}
-                    onCheckedChange={(checked) => handleTwilioChange('enabled', checked)}
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="twilio-account-sid">Account SID</Label>
+                  <Input
+                    id="twilio-account-sid"
+                    value={twilioConfig.accountSid}
+                    onChange={(e) => handleTwilioChange('accountSid', e.target.value)}
                   />
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="twilio-account-sid">Account SID</Label>
-                    <Input
-                      id="twilio-account-sid"
-                      value={twilioConfig.accountSid}
-                      onChange={(e) => handleTwilioChange('accountSid', e.target.value)}
-                      placeholder="Enter Twilio Account SID"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="twilio-auth-token">Auth Token</Label>
-                    <Input
-                      id="twilio-auth-token"
-                      type="password"
-                      value={twilioConfig.authToken}
-                      onChange={(e) => handleTwilioChange('authToken', e.target.value)}
-                      placeholder="Enter Twilio Auth Token"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="twilio-auth-token">Auth Token</Label>
+                  <Input
+                    id="twilio-auth-token"
+                    type="password"
+                    value={twilioConfig.authToken}
+                    onChange={(e) => handleTwilioChange('authToken', e.target.value)}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -1165,150 +1354,165 @@ export default function SettingsPage() {
                     id="twilio-phone-number"
                     value={twilioConfig.phoneNumber}
                     onChange={(e) => handleTwilioChange('phoneNumber', e.target.value)}
-                    placeholder="Enter Twilio Phone Number"
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
-              <Separator />
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-md bg-primary/10 p-2">
-                      <Shield className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-medium">reCAPTCHA</h3>
-                      <p className="text-sm text-muted-foreground">Bot protection service</p>
-                    </div>
-                  </div>
-                  <Switch
-                    id="recaptcha-enabled"
-                    checked={recaptchaConfig.enabled}
-                    onCheckedChange={(checked) => handleRecaptchaChange('enabled', checked)}
-                  />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="recaptcha-site-key">Site Key</Label>
-                    <Input
-                      id="recaptcha-site-key"
-                      value={recaptchaConfig.siteKey}
-                      onChange={(e) => handleRecaptchaChange('siteKey', e.target.value)}
-                      placeholder="6Lc..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="recaptcha-secret-key">Secret Key</Label>
-                    <Input
-                      id="recaptcha-secret-key"
-                      type="password"
-                      value={recaptchaConfig.secretKey}
-                      onChange={(e) => handleRecaptchaChange('secretKey', e.target.value)}
-                      placeholder="6Lc..."
-                    />
-                  </div>
-                </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>reCAPTCHA Configuration</CardTitle>
+              <CardDescription>Configure reCAPTCHA API settings for bot protection</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="recaptcha-enabled"
+                  checked={recaptchaConfig.enabled}
+                  onCheckedChange={(checked) => handleRecaptchaChange('enabled', checked)}
+                />
+                <Label htmlFor="recaptcha-enabled">Enable reCAPTCHA</Label>
               </div>
 
-              <Separator />
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-md bg-primary/10 p-2">
-                      <Bell className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-medium">Pusher</h3>
-                      <p className="text-sm text-muted-foreground">Real-time notifications service</p>
-                    </div>
-                  </div>
-                  <Switch
-                    id="pusher-enabled"
-                    checked={pusherConfig.enabled}
-                    onCheckedChange={(checked) => handlePusherChange('enabled', checked)}
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="recaptcha-site-key">Site Key</Label>
+                  <Input
+                    id="recaptcha-site-key"
+                    value={recaptchaConfig.siteKey}
+                    onChange={(e) => handleRecaptchaChange('siteKey', e.target.value)}
                   />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="pusher-app-id">App ID</Label>
-                    <Input
-                      id="pusher-app-id"
-                      value={pusherConfig.appId}
-                      onChange={(e) => handlePusherChange('appId', e.target.value)}
-                      placeholder="Enter Pusher App ID"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="pusher-key">Key</Label>
-                    <Input
-                      id="pusher-key"
-                      value={pusherConfig.key}
-                      onChange={(e) => handlePusherChange('key', e.target.value)}
-                      placeholder="Enter Pusher Key"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="pusher-secret">Secret</Label>
-                    <Input
-                      id="pusher-secret"
-                      type="password"
-                      value={pusherConfig.secret}
-                      onChange={(e) => handlePusherChange('secret', e.target.value)}
-                      placeholder="Enter Pusher Secret"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="pusher-cluster">Cluster</Label>
-                    <Select 
-                      value={pusherConfig.cluster}
-                      onValueChange={(value) => handlePusherChange('cluster', value)}
-                    >
-                      <SelectTrigger id="pusher-cluster">
-                        <SelectValue placeholder="Select cluster" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="mt1">mt1 (US East)</SelectItem>
-                        <SelectItem value="us2">us2 (US West)</SelectItem>
-                        <SelectItem value="us3">us3 (US Central)</SelectItem>
-                        <SelectItem value="eu">eu (Europe)</SelectItem>
-                        <SelectItem value="ap1">ap1 (Asia Pacific)</SelectItem>
-                        <SelectItem value="ap2">ap2 (Asia Pacific 2)</SelectItem>
-                        <SelectItem value="ap3">ap3 (Asia Pacific 3)</SelectItem>
-                        <SelectItem value="ap4">ap4 (Asia Pacific 4)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Webhook Endpoint</Label>
-                  <div className="p-4 bg-muted rounded-lg">
-                    <code className="text-sm break-all">
-                      {`${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/pusher`}
-                    </code>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Use this URL in your Pusher Dashboard webhook settings
-                  </p>
+                  <Label htmlFor="recaptcha-secret-key">Secret Key</Label>
+                  <Input
+                    id="recaptcha-secret-key"
+                    type="password"
+                    value={recaptchaConfig.secretKey}
+                    onChange={(e) => handleRecaptchaChange('secretKey', e.target.value)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Pusher Configuration</CardTitle>
+              <CardDescription>Configure Pusher API settings for real-time notifications</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="pusher-enabled"
+                  checked={pusherConfig.enabled}
+                  onCheckedChange={(checked) => handlePusherChange('enabled', checked)}
+                />
+                <Label htmlFor="pusher-enabled">Enable Pusher</Label>
+              </div>
+
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="pusher-app-id">App ID</Label>
+                  <Input
+                    id="pusher-app-id"
+                    value={pusherConfig.appId}
+                    onChange={(e) => handlePusherChange('appId', e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="pusher-key">Key</Label>
+                  <Input
+                    id="pusher-key"
+                    value={pusherConfig.key}
+                    onChange={(e) => handlePusherChange('key', e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="pusher-secret">Secret</Label>
+                  <Input
+                    id="pusher-secret"
+                    type="password"
+                    value={pusherConfig.secret}
+                    onChange={(e) => handlePusherChange('secret', e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="pusher-cluster">Cluster</Label>
+                  <Select 
+                    value={pusherConfig.cluster}
+                    onValueChange={(value) => handlePusherChange('cluster', value)}
+                  >
+                    <SelectTrigger id="pusher-cluster">
+                      <SelectValue placeholder="Select cluster" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mt1">mt1 (US East)</SelectItem>
+                      <SelectItem value="us2">us2 (US West)</SelectItem>
+                      <SelectItem value="us3">us3 (US Central)</SelectItem>
+                      <SelectItem value="eu">eu (Europe)</SelectItem>
+                      <SelectItem value="ap1">ap1 (Asia Pacific)</SelectItem>
+                      <SelectItem value="ap2">ap2 (Asia Pacific 2)</SelectItem>
+                      <SelectItem value="ap3">ap3 (Asia Pacific 3)</SelectItem>
+                      <SelectItem value="ap4">ap4 (Asia Pacific 4)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
-              <Button
-                onClick={handleSaveIntegrations}
-                disabled={saving}
-              >
-                {saving ? 'Saving...' : 'Save Integration Settings'}
-              </Button>
+              <div className="flex gap-4 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={handleTestPusherConnection}
+                  disabled={testingConnection || !pusherConfig.appId || !pusherConfig.key || !pusherConfig.secret || !pusherConfig.cluster}
+                >
+                  {testingConnection ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <TestTube className="mr-2 h-4 w-4" />
+                  )}
+                  Test Connection
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={handleSendTestNotification}
+                  disabled={sendingTestNotification || !pusherConfig.appId || !pusherConfig.key || !pusherConfig.secret || !pusherConfig.cluster}
+                >
+                  {sendingTestNotification ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <BellRing className="mr-2 h-4 w-4" />
+                  )}
+                  Send Test Notification
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Webhook Endpoint</Label>
+                <div className="p-4 bg-muted rounded-lg">
+                  <code className="text-sm break-all">
+                    {`${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/pusher`}
+                  </code>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Use this URL in your Pusher Dashboard webhook settings
+                </p>
+              </div>
             </CardContent>
           </Card>
+
+          <Button
+            onClick={handleSaveIntegrations}
+            disabled={saving}
+          >
+            {saving ? 'Saving...' : 'Save Integration Settings'}
+          </Button>
         </TabsContent>
       </Tabs>
     </div>

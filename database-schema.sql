@@ -7,7 +7,7 @@
 CREATE TABLE admin_users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE NOT NULL,
-    encrypted_password VARCHAR(255) NOT NULL,
+    encrypted_password VARCHAR(255),
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     role VARCHAR(50) NOT NULL DEFAULT 'admin',
@@ -59,15 +59,20 @@ CREATE TABLE admin_user_roles (
 -- Audit Logs Table
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id UUID NOT NULL,
     action VARCHAR(50) NOT NULL,
-    resource VARCHAR(50) NOT NULL,
-    resource_id UUID,
-    details JSONB,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    changes JSONB,
+    performed_by UUID REFERENCES admin_users(id),
+    performed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    ip_address VARCHAR(45)
 );
+
+-- Create index on entity_type and entity_id for faster lookups
+CREATE INDEX idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
+
+-- Create index on performed_at for time-based queries
+CREATE INDEX idx_audit_logs_performed_at ON audit_logs(performed_at);
 
 -- Customers Table
 CREATE TABLE customers (
