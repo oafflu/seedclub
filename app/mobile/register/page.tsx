@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/components/ui/use-toast"
-import { customerSignUp } from "@/lib/supabase/auth"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function RegisterPage() {
   const [firstName, setFirstName] = useState("")
@@ -27,6 +27,7 @@ export default function RegisterPage() {
   const [acceptTerms, setAcceptTerms] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+  const supabase = createClientComponentClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,18 +54,63 @@ export default function RegisterPage() {
     }
 
     try {
-      const { success, error, user } = await customerSignUp(email, password, firstName, lastName, phone)
+      // 1. Register with Supabase Auth
+      const { data: { user }, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { first_name: firstName, last_name: lastName }
+        }
+      })
 
-      if (!success || error) {
-        throw new Error(error || 'Registration failed')
+      if (signUpError) {
+        toast({
+          title: "Registration failed",
+          description: signUpError.message,
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
+      }
+
+      if (!user) {
+        toast({
+          title: "Registration failed",
+          description: "No user returned from Supabase.",
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // 2. Insert into customers table
+      const { error: profileError } = await supabase
+        .from("customers")
+        .insert([
+          {
+            id: user.id,
+            first_name: firstName,
+            last_name: lastName,
+            email: email,
+            phone: phone,
+            is_active: true
+          }
+        ])
+
+      if (profileError) {
+        toast({
+          title: "Registration failed",
+          description: profileError.message,
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
       }
 
       toast({
         title: "Registration successful",
         description: "Welcome to Seed Club! Please log in to continue.",
       })
-
-      // Redirect to login page
       router.push("/mobile/login")
     } catch (error: any) {
       toast({

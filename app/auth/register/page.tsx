@@ -39,37 +39,38 @@ export default function RegisterPage() {
     }
 
     try {
-      // Sign up with Supabase auth
+      // 1. Register with Supabase Auth
       const { data: { user }, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: {
-            first_name: firstName,
-            last_name: lastName,
-          },
+          data: { first_name: firstName, last_name: lastName }
         }
       })
 
-      if (signUpError) throw signUpError
-
-      if (!user) {
-        throw new Error('No user created')
+      if (signUpError) {
+        setError(signUpError.message)
+        toast({
+          title: "Registration failed",
+          description: signUpError.message,
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
       }
 
-      // Create user role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert([
-          {
-            user_id: user.id,
-            role: 'customer'
-          }
-        ])
+      if (!user) {
+        setError("No user created")
+        toast({
+          title: "Registration failed",
+          description: "No user created",
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
+      }
 
-      if (roleError) throw roleError
-
-      // Create customer profile
+      // 2. Insert into customers table
       const { error: profileError } = await supabase
         .from('customers')
         .insert([
@@ -82,7 +83,16 @@ export default function RegisterPage() {
           }
         ])
 
-      if (profileError) throw profileError
+      if (profileError) {
+        setError(profileError.message)
+        toast({
+          title: "Registration failed",
+          description: profileError.message,
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
+      }
 
       toast({
         title: "Registration successful",

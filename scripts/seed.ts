@@ -1,4 +1,5 @@
-import { supabaseAdmin } from '@/lib/supabase/client'
+import 'dotenv/config'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import bcrypt from 'bcryptjs'
 
 async function checkExistingData() {

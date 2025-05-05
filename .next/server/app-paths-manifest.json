@@ -1,9 +1,10 @@
 {
-  "/api/admin/transactions/pending/route": "app/api/admin/transactions/pending/route.js",
-  "/api/admin/transactions/route": "app/api/admin/transactions/route.js",
-  "/admin/transactions/page": "app/admin/transactions/page.js",
-  "/admin/transactions/pending/page": "app/admin/transactions/pending/page.js",
-  "/admin/system-monitoring/page": "app/admin/system-monitoring/page.js",
-  "/admin/settings/page": "app/admin/settings/page.js",
-  "/admin/dashboard/page": "app/admin/dashboard/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/auth/login/page": "app/auth/login/page.js",
+  "/mobile/dashboard/page": "app/mobile/dashboard/page.js",
+  "/mobile/profile/page": "app/mobile/profile/page.js",
+  "/mobile/profile/security/page": "app/mobile/profile/security/page.js",
+  "/mobile/wallet/page": "app/mobile/wallet/page.js",
+  "/mobile/invest/page": "app/mobile/invest/page.js",
+  "/mobile/referrals/page": "app/mobile/referrals/page.js"
 }

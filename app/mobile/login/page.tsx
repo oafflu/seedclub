@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { customerLogin } from "@/lib/supabase/auth"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -21,6 +21,7 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const router = useRouter()
   const { toast } = useToast()
+  const supabase = createClientComponentClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,23 +33,63 @@ export default function LoginPage() {
     const password = formData.get("password") as string
 
     try {
-      const { success, error: loginError, user } = await customerLogin(email, password)
+      // 1. Login with Supabase Auth
+      const { data: { session }, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
 
-      if (!success || loginError) {
-        throw new Error(loginError || 'Login failed')
+      if (signInError) {
+        setError(signInError.message)
+        toast({
+          title: "Login failed",
+          description: signInError.message,
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
       }
 
-      // Store session
+      if (!session) {
+        setError("No session returned from Supabase")
+        toast({
+          title: "Login failed",
+          description: "No session returned from Supabase",
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // 2. Fetch customer profile
+      const { data: customer, error: customerError } = await supabase
+        .from("customers")
+        .select("*")
+        .eq("id", session.user.id)
+        .single()
+
+      if (customerError || !customer) {
+        setError(customerError?.message || "Customer profile not found.")
+        toast({
+          title: "Login failed",
+          description: customerError?.message || "Customer profile not found.",
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // Store session/profile as needed
       localStorage.setItem('customer_session', JSON.stringify({
-        id: user.id,
-        email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name
+        id: customer.id,
+        email: customer.email,
+        firstName: customer.first_name,
+        lastName: customer.last_name
       }))
 
       toast({
         title: "Login successful",
-        description: `Welcome back, ${user.first_name}!`,
+        description: `Welcome back, ${customer.first_name}!`,
       })
 
       // Redirect to customer dashboard

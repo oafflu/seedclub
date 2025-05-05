@@ -308,10 +308,10 @@ export default function CustomersPage() {
   const filteredCustomers = customers.filter((customer) => {
     // Search filter
     const searchMatch =
-      customer.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.id.toLowerCase().includes(searchTerm.toLowerCase())
+      (customer.firstName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (customer.lastName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (customer.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (customer.id || "").toLowerCase().includes(searchTerm.toLowerCase())
 
     // Tab filter
     const tabMatch =
@@ -473,7 +473,7 @@ export default function CustomersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCustomers.map((customer) => (
+                  {filteredCustomers.map((customer, idx) => (
                     <TableRow key={customer.id}>
                       <TableCell>
                         <Checkbox
@@ -481,15 +481,17 @@ export default function CustomersPage() {
                           onCheckedChange={() => toggleCustomerSelection(customer.id)}
                         />
                       </TableCell>
-                      <TableCell className="font-medium">{customer.id}</TableCell>
+                      <TableCell className="font-semibold">
+                        {customer.code || `CUST-${(idx + 1).toString().padStart(3, '0')}`}
+                      </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback>{customer.firstName.charAt(0)}</AvatarFallback>
+                            <AvatarFallback>{(customer.firstName?.charAt(0) || "?")}</AvatarFallback>
                           </Avatar>
-                          <div>
-                            <div className="font-medium">{`${customer.firstName} ${customer.lastName}`}</div>
-                            <div className="text-xs text-muted-foreground">{customer.email}</div>
+                          <div className="flex flex-col">
+                            <span className="font-semibold">{`${customer.firstName} ${customer.lastName}`}</span>
+                            <span className="text-xs text-muted-foreground">{customer.email}</span>
                           </div>
                         </div>
                       </TableCell>
@@ -587,62 +589,42 @@ export default function CustomersPage() {
                                 <DialogDescription>Detailed information about the customer.</DialogDescription>
                               </DialogHeader>
                               {viewCustomer && (
-                                <div className="grid gap-4 py-4">
-                                  <div className="flex items-center gap-4">
-                                    <Avatar className="h-16 w-16">
-                                      <AvatarFallback className="text-lg">{viewCustomer.firstName.charAt(0)}</AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                      <h3 className="text-lg font-semibold">{`${viewCustomer.firstName} ${viewCustomer.lastName}`}</h3>
-                                      <p className="text-sm text-muted-foreground">{viewCustomer.email}</p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                                  <div className="flex flex-col items-start gap-4 md:col-span-1">
+                                    <div className="flex items-center gap-4">
+                                      <Avatar className="h-16 w-16">
+                                        <AvatarFallback className="text-lg">{viewCustomer.firstName?.charAt(0) || "?"}</AvatarFallback>
+                                      </Avatar>
+                                      <div>
+                                        <h3 className="text-lg font-semibold">{viewCustomer.firstName || "N/A"} {viewCustomer.lastName || ""}</h3>
+                                        <div className="text-xs text-muted-foreground">{viewCustomer.email || "N/A"}</div>
+                                      </div>
+                                    </div>
+                                    <div className="text-sm text-muted-foreground mt-2">
+                                      <span className="font-medium">Phone:</span> {viewCustomer.phone || "N/A"}
                                     </div>
                                   </div>
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                      <Label className="text-sm text-muted-foreground">Customer ID</Label>
-                                      <p>{viewCustomer.id}</p>
-                                    </div>
-                                    <div>
-                                      <Label className="text-sm text-muted-foreground">Phone</Label>
-                                      <p>{viewCustomer.phone}</p>
-                                    </div>
-                                    <div>
-                                      <Label className="text-sm text-muted-foreground">Join Date</Label>
-                                      <p>{new Date(viewCustomer.createdAt).toLocaleDateString()}</p>
-                                    </div>
-                                    <div>
-                                      <Label className="text-sm text-muted-foreground">Status</Label>
-                                      <p>
-                                        <Badge variant={viewCustomer.status === "active" ? "default" : "secondary"}>
-                                          {viewCustomer.status}
-                                        </Badge>
-                                      </p>
-                                    </div>
-                                    <div>
-                                      <Label className="text-sm text-muted-foreground">KYC Status</Label>
-                                      <p>
-                                        <Badge
-                                          variant={
-                                            viewCustomer.kycStatus === "verified"
-                                              ? "default"
-                                              : viewCustomer.kycStatus === "pending"
-                                                ? "outline"
-                                                : "destructive"
-                                          }
-                                        >
-                                          {viewCustomer.kycStatus}
-                                        </Badge>
-                                      </p>
-                                    </div>
-                                    <div>
-                                      <Label className="text-sm text-muted-foreground">Total Invested</Label>
-                                      <p>${viewCustomer.totalInvested?.toLocaleString()}</p>
-                                    </div>
+                                  <div className="grid grid-cols-2 gap-x-6 gap-y-2 md:col-span-1 text-sm">
+                                    <div className="font-medium text-muted-foreground">Customer ID</div>
+                                    <div>{viewCustomer.id}</div>
+                                    <div className="font-medium text-muted-foreground">Phone</div>
+                                    <div>{viewCustomer.phone || "N/A"}</div>
+                                    <div className="font-medium text-muted-foreground">Join Date</div>
+                                    <div>{viewCustomer.createdAt ? new Date(viewCustomer.createdAt).toISOString().split('T')[0] : "N/A"}</div>
+                                    <div className="font-medium text-muted-foreground">Status</div>
+                                    <div><Badge variant={viewCustomer.status === "active" ? "default" : "secondary"}>{viewCustomer.status}</Badge></div>
+                                    <div className="font-medium text-muted-foreground">KYC Status</div>
+                                    <div><Badge variant={viewCustomer.kycStatus === "verified" ? "default" : viewCustomer.kycStatus === "pending" ? "outline" : "destructive"}>{viewCustomer.kycStatus}</Badge></div>
+                                    <div className="font-medium text-muted-foreground">Total Invested</div>
+                                    <div>${viewCustomer.totalInvested?.toLocaleString() || "0.00"}</div>
                                   </div>
                                 </div>
                               )}
-                              <DialogFooter>
-                                <Button variant="outline" onClick={() => router.push(`/admin/customers/edit/${viewCustomer?.id}`)}>
+                              <DialogFooter className="flex flex-row justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  onClick={() => router.push(`/admin/customers/edit/${viewCustomer?.code}`)}
+                                >
                                   Edit Customer
                                 </Button>
                                 <Button onClick={() => router.push(`/admin/customers/${viewCustomer?.id}/investments`)}>
@@ -654,7 +636,7 @@ export default function CustomersPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => router.push(`/admin/customers/edit/${customer.id}`)}
+                            onClick={() => router.push(`/admin/customers/edit/${customer.code}`)}
                           >
                             <Edit className="h-4 w-4" />
                             <span className="sr-only">Edit</span>
@@ -670,8 +652,10 @@ export default function CustomersPage() {
                               <DropdownMenuItem onSelect={() => handleSendEmail(customer.id)}>
                                 <Mail className="mr-2 h-4 w-4" /> Email Customer
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Phone className="mr-2 h-4 w-4" /> Call Customer
+                              <DropdownMenuItem asChild>
+                                <a href={`tel:${customer.phone || ''}`}>
+                                  <Phone className="mr-2 h-4 w-4" /> Call Customer
+                                </a>
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem

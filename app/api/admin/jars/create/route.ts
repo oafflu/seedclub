@@ -33,15 +33,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized - No valid session' }, { status: 401 })
     }
 
-    // Check if user has admin role
-    const { data: userRole, error: roleError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', session.user.id)
+    // Check if user has admin or super_admin role
+    const { data: adminUser, error: adminError } = await supabase
+      .from('admin_users')
+      .select('id, role')
+      .eq('id', session.user.id)
       .single()
 
-    if (roleError || !userRole || userRole.role !== 'admin') {
-      console.error('Role error:', roleError)
+    if (adminError || !adminUser || !['admin', 'super_admin'].includes(adminUser.role)) {
+      console.error('Admin user/role error:', adminError)
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 })
     }
 
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
     if (error) {
       console.error('Error creating jar:', error)
       return NextResponse.json(
-        { error: error.message },
+        { error: error?.message || JSON.stringify(error) || 'Internal Server Error' },
         { 
           status: 500,
           headers: {
@@ -153,7 +153,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error creating jar:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal Server Error' },
+      { error: error instanceof Error ? error.message : JSON.stringify(error) || 'Internal Server Error' },
       { 
         status: 500,
         headers: {

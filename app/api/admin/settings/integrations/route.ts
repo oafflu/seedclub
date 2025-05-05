@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase/client'
+import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getSession } from '@/lib/auth'
+import { createNotification } from '@/lib/notifications/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -91,6 +93,18 @@ export async function POST(request: Request) {
         changes: settings,
         performed_at: new Date().toISOString()
       }])
+
+    // Create admin notification
+    const session = await getSession(true)
+    if (session?.user) {
+      await createNotification({
+        title: 'Integration Settings Updated',
+        message: 'Integration settings were updated.',
+        type: 'system',
+        priority: 'medium',
+        recipientId: session.user.id
+      })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

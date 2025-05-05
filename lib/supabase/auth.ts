@@ -1,5 +1,6 @@
 import { supabase } from './client'
 import bcrypt from 'bcryptjs'
+import { sendEmail } from '@/lib/email'
 
 export type UserRole = 'customer' | 'admin'
 
@@ -59,9 +60,32 @@ export const customerSignUp = async (
       user: customer
     }
   } catch (error: any) {
+    console.error('Registration/Login error:', error)
+    console.error('Registration/Login error (typeof):', typeof error, error)
+    console.error('Registration/Login error (keys):', Object.keys(error))
+    let errorMsg = "Unknown error"
+    if (error) {
+      if (typeof error === "string") {
+        errorMsg = error
+      } else if (error.message) {
+        errorMsg = error.message
+      } else if (error.error_description) {
+        errorMsg = error.error_description
+      } else if (error.msg) {
+        errorMsg = error.msg
+      } else if (typeof error === "object" && Object.keys(error).length === 0) {
+        errorMsg = "Unknown error (empty object). This may be a database constraint violation, a Supabase misconfiguration, or a permissions issue. Please check your Supabase table schema and API keys."
+      } else {
+        try {
+          errorMsg = JSON.stringify(error)
+        } catch {
+          errorMsg = String(error)
+        }
+      }
+    }
     return {
       success: false,
-      error: error.message
+      error: errorMsg
     }
   }
 }
@@ -103,9 +127,32 @@ export const customerLogin = async (
       user: customer
     }
   } catch (error: any) {
+    console.error('Registration/Login error:', error)
+    console.error('Registration/Login error (typeof):', typeof error, error)
+    console.error('Registration/Login error (keys):', Object.keys(error))
+    let errorMsg = "Unknown error"
+    if (error) {
+      if (typeof error === "string") {
+        errorMsg = error
+      } else if (error.message) {
+        errorMsg = error.message
+      } else if (error.error_description) {
+        errorMsg = error.error_description
+      } else if (error.msg) {
+        errorMsg = error.msg
+      } else if (typeof error === "object" && Object.keys(error).length === 0) {
+        errorMsg = "Unknown error (empty object). This may be a database constraint violation, a Supabase misconfiguration, or a permissions issue. Please check your Supabase table schema and API keys."
+      } else {
+        try {
+          errorMsg = JSON.stringify(error)
+        } catch {
+          errorMsg = String(error)
+        }
+      }
+    }
     return {
       success: false,
-      error: error.message
+      error: errorMsg
     }
   }
 }
@@ -159,9 +206,32 @@ export const adminLogin = async (
       user: admin
     }
   } catch (error: any) {
+    console.error('Registration/Login error:', error)
+    console.error('Registration/Login error (typeof):', typeof error, error)
+    console.error('Registration/Login error (keys):', Object.keys(error))
+    let errorMsg = "Unknown error"
+    if (error) {
+      if (typeof error === "string") {
+        errorMsg = error
+      } else if (error.message) {
+        errorMsg = error.message
+      } else if (error.error_description) {
+        errorMsg = error.error_description
+      } else if (error.msg) {
+        errorMsg = error.msg
+      } else if (typeof error === "object" && Object.keys(error).length === 0) {
+        errorMsg = "Unknown error (empty object). This may be a database constraint violation, a Supabase misconfiguration, or a permissions issue. Please check your Supabase table schema and API keys."
+      } else {
+        try {
+          errorMsg = JSON.stringify(error)
+        } catch {
+          errorMsg = String(error)
+        }
+      }
+    }
     return {
       success: false,
-      error: error.message
+      error: errorMsg
     }
   }
 }
@@ -196,9 +266,32 @@ export const verifyEmail = async (token: string): Promise<AuthResponse> => {
       user: customer
     }
   } catch (error: any) {
+    console.error('Registration/Login error:', error)
+    console.error('Registration/Login error (typeof):', typeof error, error)
+    console.error('Registration/Login error (keys):', Object.keys(error))
+    let errorMsg = "Unknown error"
+    if (error) {
+      if (typeof error === "string") {
+        errorMsg = error
+      } else if (error.message) {
+        errorMsg = error.message
+      } else if (error.error_description) {
+        errorMsg = error.error_description
+      } else if (error.msg) {
+        errorMsg = error.msg
+      } else if (typeof error === "object" && Object.keys(error).length === 0) {
+        errorMsg = "Unknown error (empty object). This may be a database constraint violation, a Supabase misconfiguration, or a permissions issue. Please check your Supabase table schema and API keys."
+      } else {
+        try {
+          errorMsg = JSON.stringify(error)
+        } catch {
+          errorMsg = String(error)
+        }
+      }
+    }
     return {
       success: false,
-      error: error.message
+      error: errorMsg
     }
   }
 }
@@ -230,9 +323,32 @@ export const requestPasswordReset = async (email: string): Promise<AuthResponse>
       success: true
     }
   } catch (error: any) {
+    console.error('Registration/Login error:', error)
+    console.error('Registration/Login error (typeof):', typeof error, error)
+    console.error('Registration/Login error (keys):', Object.keys(error))
+    let errorMsg = "Unknown error"
+    if (error) {
+      if (typeof error === "string") {
+        errorMsg = error
+      } else if (error.message) {
+        errorMsg = error.message
+      } else if (error.error_description) {
+        errorMsg = error.error_description
+      } else if (error.msg) {
+        errorMsg = error.msg
+      } else if (typeof error === "object" && Object.keys(error).length === 0) {
+        errorMsg = "Unknown error (empty object). This may be a database constraint violation, a Supabase misconfiguration, or a permissions issue. Please check your Supabase table schema and API keys."
+      } else {
+        try {
+          errorMsg = JSON.stringify(error)
+        } catch {
+          errorMsg = String(error)
+        }
+      }
+    }
     return {
       success: false,
-      error: error.message
+      error: errorMsg
     }
   }
 }
@@ -269,6 +385,13 @@ const generateVerificationToken = () => {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
 }
 
+// STUB: sendResetEmail is not implemented yet
+const sendResetEmail = async (email: string, token: string) => {
+  // TODO: Implement password reset email logic
+  console.warn('sendResetEmail is not implemented. Email:', email, 'Token:', token)
+  return Promise.resolve()
+}
+
 const getCurrentIP = async () => {
   try {
     const response = await fetch('https://api.ipify.org?format=json')
@@ -280,7 +403,12 @@ const getCurrentIP = async () => {
 }
 
 const sendVerificationEmail = async (email: string, token: string) => {
-  return sendEmail(email, token)
+  // TODO: Replace with actual email template and subject
+  return sendEmail({
+    to: email,
+    subject: 'Verify your Seed Club account',
+    html: `<p>Please verify your account using this token: ${token}</p>`
+  })
 }
 
 const sendPasswordResetEmail = async (email: string, token: string) => {

@@ -77,6 +77,7 @@ CREATE INDEX idx_audit_logs_performed_at ON audit_logs(performed_at);
 -- Customers Table
 CREATE TABLE customers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(20) UNIQUE,
     email VARCHAR(255) UNIQUE NOT NULL,
     encrypted_password VARCHAR(255) NOT NULL,
     first_name VARCHAR(100),

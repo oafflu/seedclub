@@ -1,8 +1,9 @@
-import { supabaseAdmin } from "@/lib/supabase/admin"
+// import { supabaseAdmin } from "@/lib/supabase/admin"
 import { createClient } from "@supabase/supabase-js"
 
 export interface CustomerProfile {
   id: string
+  code?: string // Short customer code like CUST-001
   firstName: string
   lastName: string
   email: string
@@ -89,6 +90,7 @@ class CustomerService {
 
         return {
           id: customer.id,
+          code: customer.code,
           firstName: customer.first_name,
           lastName: customer.last_name,
           email: customer.email,
@@ -122,95 +124,22 @@ class CustomerService {
   }
 
   async getCustomerById(id: string): Promise<CustomerProfile | null> {
-    const { data: customer, error } = await supabaseAdmin
-      .from("customers")
-      .select(`
-        *,
-        customer_profiles (*),
-        kyc_verifications (status),
-        customer_jars (
-          id,
-          initial_amount,
-          current_value
-        )
-      `)
-      .eq("id", id)
-      .single()
-
-    if (error) return null
-
-    return {
-      id: customer.id,
-      firstName: customer.first_name,
-      lastName: customer.last_name,
-      email: customer.email,
-      phone: customer.phone,
-      status: customer.is_active ? "active" : "inactive",
-      kycStatus: customer.kyc_verifications?.[0]?.status || "pending",
-      addressLine1: customer.customer_profiles?.address_line1,
-      addressLine2: customer.customer_profiles?.address_line2,
-      city: customer.customer_profiles?.city,
-      state: customer.customer_profiles?.state,
-      zipCode: customer.customer_profiles?.zip_code,
-      country: customer.customer_profiles?.country,
-      dateOfBirth: customer.customer_profiles?.date_of_birth,
-      taxId: customer.customer_profiles?.tax_id,
-      occupation: customer.customer_profiles?.occupation,
-      employerName: customer.customer_profiles?.employer_name,
-      annualIncome: customer.customer_profiles?.annual_income?.toString(),
-      sourceOfFunds: customer.customer_profiles?.source_of_funds,
-      notes: customer.customer_profiles?.notes,
-      receiveMarketingEmails: customer.customer_profiles?.receive_marketing_emails || false,
-      totalInvested: customer.customer_jars?.reduce((sum: number, jar: any) => sum + jar.current_value, 0) || 0,
-      jars: customer.customer_jars?.length || 0,
-      createdAt: customer.created_at,
-      updatedAt: customer.updated_at,
-    }
+    const res = await fetch(`/api/admin/customers/${id}`);
+    if (!res.ok) return null;
+    return res.json();
   }
 
   async createCustomer(data: Partial<CustomerProfile>): Promise<CustomerProfile> {
-    // First create the customer
-    const { data: customer, error: customerError } = await supabaseAdmin.from("customers").insert({
-      first_name: data.firstName,
-      last_name: data.lastName,
-      email: data.email,
-      phone: data.phone,
-      is_active: data.status === "active",
-    }).select().single()
-
-    if (customerError) throw customerError
-
-    // Then create the customer profile
-    const { error: profileError } = await supabaseAdmin.from("customer_profiles").insert({
-      customer_id: customer.id,
-      address_line1: data.addressLine1,
-      address_line2: data.addressLine2,
-      city: data.city,
-      state: data.state,
-      zip_code: data.zipCode,
-      country: data.country,
-      date_of_birth: data.dateOfBirth,
-      tax_id: data.taxId,
-      occupation: data.occupation,
-      employer_name: data.employerName,
-      annual_income: data.annualIncome ? parseFloat(data.annualIncome.toString()) : null,
-      source_of_funds: data.sourceOfFunds,
-      notes: data.notes,
-      receive_marketing_emails: data.receiveMarketingEmails,
-    })
-
-    if (profileError) throw profileError
-
-    // Create initial KYC verification record
-    const { error: kycError } = await supabaseAdmin.from("kyc_verifications").insert({
-      customer_id: customer.id,
-      document_type: "pending",
-      status: "pending",
-    })
-
-    if (kycError) throw kycError
-
-    return this.getCustomerById(customer.id) as Promise<CustomerProfile>
+    const res = await fetch('/api/admin/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.error || 'Failed to create customer');
+    }
+    return res.json();
   }
 
   async updateCustomer(id: string, data: Partial<CustomerProfile>): Promise<CustomerProfile> {

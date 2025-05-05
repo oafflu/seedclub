@@ -1572,6 +1572,12 @@ video {
 .gap-8 {
   gap: 2rem;
 }
+.gap-x-6 {
+  column-gap: 1.5rem;
+}
+.gap-y-2 {
+  row-gap: 0.5rem;
+}
 .space-x-1 > :not([hidden]) ~ :not([hidden]) {
   --tw-space-x-reverse: 0;
   margin-right: calc(0.25rem * var(--tw-space-x-reverse));
@@ -4331,6 +4337,10 @@ video {
 
   .md\:absolute {
     position: absolute;
+  }
+
+  .md\:col-span-1 {
+    grid-column: span 1 / span 1;
   }
 
   .md\:col-span-2 {

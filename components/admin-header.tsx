@@ -11,11 +11,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-
-// Mock unread notification count
-const unreadNotifications = 5
+import { useAdminNotifications } from '@/hooks/use-admin-notifications'
 
 export function AdminHeader() {
+  const { unreadCount } = useAdminNotifications()
   return (
     <header className="sticky top-0 z-50 bg-ivory border-b">
       <div className="container flex h-16 items-center justify-between px-4">
@@ -36,9 +35,9 @@ export function AdminHeader() {
           <Button variant="ghost" size="icon" asChild className="relative text-primary-teal">
             <Link href="/admin/notifications">
               <Bell className="h-5 w-5" />
-              {unreadNotifications > 0 && (
+              {unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white">
-                  {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                  {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
               <span className="sr-only">Notifications</span>
