@@ -1,10 +1,7 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
-  "/auth/login/page": "app/auth/login/page.js",
-  "/mobile/dashboard/page": "app/mobile/dashboard/page.js",
-  "/mobile/profile/page": "app/mobile/profile/page.js",
-  "/mobile/profile/security/page": "app/mobile/profile/security/page.js",
-  "/mobile/wallet/page": "app/mobile/wallet/page.js",
-  "/mobile/invest/page": "app/mobile/invest/page.js",
-  "/mobile/referrals/page": "app/mobile/referrals/page.js"
+  "/api/admin/customers/route": "app/api/admin/customers/route.js",
+  "/api/admin/jars/route": "app/api/admin/jars/route.js",
+  "/admin/jars/edit/[id]/page": "app/admin/jars/edit/[id]/page.js",
+  "/admin/jars/page": "app/admin/jars/page.js",
+  "/admin/customers/page": "app/admin/customers/page.js"
 }

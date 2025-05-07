@@ -342,7 +342,11 @@ export default function CreateJarPage() {
           .upload(`${session.user.id}/${Date.now()}-${data.iconFile.name}`, data.iconFile)
 
         if (uploadError) throw uploadError
-        iconName = uploadData.path
+        // Get the public URL for the uploaded file
+        const { data: publicUrlData } = supabase.storage
+          .from('jar-icons')
+          .getPublicUrl(uploadData.path)
+        iconName = publicUrlData.publicUrl
       } else if (data.iconType === "default" && data.selectedIcon) {
         iconName = data.selectedIcon
       }

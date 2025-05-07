@@ -29,6 +29,7 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "@/components/ui/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 // Form schema
 const formSchema = z.object({
@@ -80,6 +81,7 @@ export default function EditJarPage({ params }: { params: Promise<{ id: string }
   const [previewIcon, setPreviewIcon] = useState<string | null>(null)
   const [uploadingIcon, setUploadingIcon] = useState(false)
   const [selectedIcon, setSelectedIcon] = useState<string>("PiggyBank")
+  const supabase = createClientComponentClient()
 
   // Initialize form with default values
   const form = useForm<FormValues>({
@@ -195,15 +197,15 @@ export default function EditJarPage({ params }: { params: Promise<{ id: string }
   const onSubmit = async (values: FormValues) => {
     try {
       setIsLoading(true)
-
       // Prepare jar data based on selected term
       const termMonths = parseInt(selectedTab.split('-')[0])
       const interestRate = termMonths === 12 ? 10 : termMonths === 24 ? 12 : 15
 
-      // Handle file upload
-      let iconFile = undefined
+      let iconName = values.iconName
+      let iconType = values.iconType
+      let iconFile = undefined;
       if (values.iconType === 'upload' && previewIcon) {
-        iconFile = previewIcon
+        iconFile = previewIcon;
       }
 
       const response = await fetch(`/api/admin/jars/${resolvedParams.id}`, {
@@ -215,6 +217,8 @@ export default function EditJarPage({ params }: { params: Promise<{ id: string }
           ...values,
           termMonths,
           interestRate,
+          iconName,
+          iconType,
           iconFile,
         }),
       })
@@ -222,7 +226,17 @@ export default function EditJarPage({ params }: { params: Promise<{ id: string }
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to update jar')
+        console.error('API error response:', data)
+        console.error('API error property:', data.error)
+        let errorMsg = ''
+        if (typeof data.error === 'string') {
+          errorMsg = data.error
+        } else if (typeof data.error === 'object' && data.error !== null) {
+          errorMsg = Object.entries(data.error).map(([k, v]) => `${k}: ${v}`).join('; ')
+        } else {
+          errorMsg = JSON.stringify(data.error)
+        }
+        throw new Error(errorMsg || 'Failed to update jar')
       }
 
       toast({

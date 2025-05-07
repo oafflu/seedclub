@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
@@ -194,8 +195,26 @@ export default function JarsPage() {
   }
 
   // Helper function to get the icon component
-  const getIconComponent = (iconName: string) => {
-    const icons = {
+  const getIconComponent = (iconName: string | null) => {
+    if (!iconName) return <PiggyBank className="h-5 w-5" />;
+    // If iconName looks like a URL, render an image
+    if (
+      iconName.startsWith('http') ||
+      iconName.startsWith('/storage/') ||
+      iconName.startsWith('https://') ||
+      iconName.startsWith('data:image')
+    ) {
+      return (
+        <img
+          src={iconName}
+          alt="Jar Icon"
+          className="h-5 w-5 object-contain"
+          style={{ maxWidth: 24, maxHeight: 24 }}
+        />
+      );
+    }
+    // Map default icon names to components (case-insensitive)
+    const icons: Record<string, React.ReactNode> = {
       PiggyBank: <PiggyBank className="h-5 w-5" />,
       Sprout: <Sprout className="h-5 w-5" />,
       Leaf: <Leaf className="h-5 w-5" />,
@@ -203,8 +222,15 @@ export default function JarsPage() {
       Palm: <Palm className="h-5 w-5" />,
       Oak: <Oak className="h-5 w-5" />,
       Flower: <Flower className="h-5 w-5" />,
+      'piggy-bank': <PiggyBank className="h-5 w-5" />,
+      'sprout': <Sprout className="h-5 w-5" />,
+      'leaf': <Leaf className="h-5 w-5" />,
+      'trees': <Trees className="h-5 w-5" />,
+      'palm': <Palm className="h-5 w-5" />,
+      'oak': <Oak className="h-5 w-5" />,
+      'flower': <Flower className="h-5 w-5" />,
     };
-    return icons[iconName as keyof typeof icons] || <PiggyBank className="h-5 w-5" />;
+    return icons[iconName] || icons[iconName.charAt(0).toUpperCase() + iconName.slice(1)] || <PiggyBank className="h-5 w-5" />;
   };
 
   // Export function
@@ -440,7 +466,7 @@ export default function JarsPage() {
                     </TableCell>
                     <TableCell>
                       {jar.icon_name ? (
-                        <div className="w-8 h-8 flex items-center justify-center bg-muted rounded-lg">
+                        <div className="w-8 h-8 flex items-center justify-center bg-muted rounded-lg overflow-hidden">
                           {getIconComponent(jar.icon_name)}
                         </div>
                       ) : (
