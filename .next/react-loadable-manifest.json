@@ -1,22 +1,4 @@
 {
-  "app/admin/customers/page.tsx -> jspdf": {
-    "id": "app/admin/customers/page.tsx -> jspdf",
-    "files": [
-      "static/chunks/_app-pages-browser_node_modules_pnpm_jspdf_3_0_1_node_modules_jspdf_dist_jspdf_es_min_js.js"
-    ]
-  },
-  "app/admin/customers/page.tsx -> jspdf-autotable": {
-    "id": "app/admin/customers/page.tsx -> jspdf-autotable",
-    "files": [
-      "static/chunks/_app-pages-browser_node_modules_pnpm_jspdf-autotable_5_0_2_jspdf_3_0_1_node_modules_jspdf-aut-c92533.js"
-    ]
-  },
-  "app/admin/customers/page.tsx -> xlsx": {
-    "id": "app/admin/customers/page.tsx -> xlsx",
-    "files": [
-      "static/chunks/_app-pages-browser_node_modules_pnpm_xlsx_0_18_5_node_modules_xlsx_xlsx_mjs.js"
-    ]
-  },
   "app/admin/jars/page.tsx -> jspdf": {
     "id": "app/admin/jars/page.tsx -> jspdf",
     "files": [

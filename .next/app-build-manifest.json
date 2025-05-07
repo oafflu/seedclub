@@ -11,25 +11,20 @@
       "static/chunks/main-app.js",
       "static/chunks/app/admin/layout.js"
     ],
+    "/admin/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/page.js"
+    ],
+    "/admin/dashboard/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/dashboard/page.js"
+    ],
     "/admin/jars/loading": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/admin/jars/loading.js"
-    ],
-    "/admin/jars/edit/[id]/loading": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/admin/jars/edit/[id]/loading.js"
-    ],
-    "/admin/jars/edit/[id]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/admin/jars/edit/[id]/page.js"
-    ],
-    "/api/admin/jars/[id]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/jars/[id]/route.js"
     ],
     "/admin/jars/page": [
       "static/chunks/webpack.js",
@@ -41,20 +36,50 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/admin/jars/route.js"
     ],
-    "/admin/customers/loading": [
+    "/admin/settings/loading": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/customers/loading.js"
+      "static/chunks/app/admin/settings/loading.js"
     ],
-    "/admin/customers/page": [
+    "/admin/settings/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/customers/page.js"
+      "static/chunks/app/admin/settings/page.js"
     ],
-    "/api/admin/customers/route": [
+    "/api/admin/settings/general/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/customers/route.js"
+      "static/chunks/app/api/admin/settings/general/route.js"
+    ],
+    "/api/admin/settings/notifications/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/settings/notifications/route.js"
+    ],
+    "/api/admin/settings/security/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/settings/security/route.js"
+    ],
+    "/api/admin/settings/investment/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/settings/investment/route.js"
+    ],
+    "/api/admin/settings/integrations/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/settings/integrations/route.js"
+    ],
+    "/admin/notifications/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/notifications/loading.js"
+    ],
+    "/admin/notifications/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/notifications/page.js"
     ]
   }
 }

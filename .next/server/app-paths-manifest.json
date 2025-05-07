@@ -1,7 +1,11 @@
 {
-  "/api/admin/customers/route": "app/api/admin/customers/route.js",
-  "/api/admin/jars/route": "app/api/admin/jars/route.js",
-  "/admin/jars/edit/[id]/page": "app/admin/jars/edit/[id]/page.js",
+  "/api/admin/settings/general/route": "app/api/admin/settings/general/route.js",
+  "/api/admin/settings/investment/route": "app/api/admin/settings/investment/route.js",
+  "/api/admin/settings/integrations/route": "app/api/admin/settings/integrations/route.js",
+  "/api/admin/settings/notifications/route": "app/api/admin/settings/notifications/route.js",
+  "/api/admin/settings/security/route": "app/api/admin/settings/security/route.js",
+  "/admin/dashboard/page": "app/admin/dashboard/page.js",
   "/admin/jars/page": "app/admin/jars/page.js",
-  "/admin/customers/page": "app/admin/customers/page.js"
+  "/admin/settings/page": "app/admin/settings/page.js",
+  "/admin/notifications/page": "app/admin/notifications/page.js"
 }

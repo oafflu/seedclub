@@ -240,8 +240,6 @@ export default function JarsPage() {
       const data = jars.map((jar: Jar) => ({
         Name: jar.name,
         Description: jar.description,
-        'Term (months)': jar.term_months,
-        'Interest Rate (%)': jar.interest_rate,
         'Minimum Investment ($)': jar.minimum_investment,
         'Maximum Investment ($)': jar.maximum_investment || 'No limit',
         'Early Withdrawal Penalty (%)': jar.early_withdrawal_penalty || 'N/A',
@@ -448,8 +446,6 @@ export default function JarsPage() {
                   <TableHead className="w-12">Icon</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Term</TableHead>
-                  <TableHead>Interest Rate</TableHead>
                   <TableHead>Min. Investment</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -477,8 +473,6 @@ export default function JarsPage() {
                     </TableCell>
                     <TableCell className="font-medium">{jar.name}</TableCell>
                     <TableCell className="max-w-[300px] truncate">{jar.description}</TableCell>
-                    <TableCell>{jar.term_months} months</TableCell>
-                    <TableCell>{jar.interest_rate}%</TableCell>
                     <TableCell>${jar.minimum_investment.toLocaleString()}</TableCell>
                     <TableCell>
                       <Badge variant={jar.is_active ? "default" : "secondary"}>

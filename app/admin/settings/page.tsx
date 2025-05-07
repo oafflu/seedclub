@@ -124,11 +124,11 @@ export default function SettingsPage() {
     smsMarketing: false,
   })
   const [investmentSettings, setInvestmentSettings] = useState({
-    jars: {
-      '12': { apy: 12, min: 1000, earlyFee: 2, active: true },
-      '24': { apy: 14, min: 2500, earlyFee: 3, active: true },
-      '36': { apy: 16, min: 5000, earlyFee: 4, active: true },
-    },
+    jars: [
+      { term: 12, apy: 12, min: 1000, earlyFee: 2, active: true },
+      { term: 24, apy: 14, min: 2500, earlyFee: 3, active: true },
+      { term: 36, apy: 16, min: 5000, earlyFee: 4, active: true },
+    ],
     interest: {
       calculation: 'compound',
       frequency: 'monthly',
@@ -220,18 +220,35 @@ export default function SettingsPage() {
     })
     fetch('/api/admin/settings/notifications').then(r => r.json()).then(data => {
       if (data && Object.keys(data).length) setNotificationSettings(data)
+      else setNotificationSettings({
+        supportEmail: '',
+        replyToEmail: '',
+        adminNewUser: true,
+        adminLargeDeposit: true,
+        adminLargeWithdrawal: true,
+        adminSupportTicket: true,
+        customerWelcome: true,
+        customerDeposit: true,
+        customerWithdrawal: true,
+        customerInterest: true,
+        customerMaturity: true,
+        smsEnabled: false,
+        smsProvider: 'twilio',
+        smsSecurity: true,
+        smsTransaction: true,
+        smsMarketing: false,
+      })
     })
   }, [])
 
-  // Load integration settings on mount
   useEffect(() => {
     fetch('/api/admin/settings/integrations').then(r => r.json()).then(data => {
-      if (data) setIntegrationSettings({
-        stripe: data.stripe_config || integrationSettings.stripe,
-        twilio: data.twilio_config || integrationSettings.twilio,
-        recaptcha: data.recaptcha_config || integrationSettings.recaptcha,
-        pusher: data.pusher_config || integrationSettings.pusher
-      })
+      setIntegrationSettings(prev => ({
+        stripe: (data && data.stripe_config) ? data.stripe_config : prev.stripe,
+        twilio: (data && data.twilio_config) ? data.twilio_config : prev.twilio,
+        recaptcha: (data && data.recaptcha_config) ? data.recaptcha_config : prev.recaptcha,
+        pusher: (data && data.pusher_config) ? data.pusher_config : prev.pusher
+      }))
     })
   }, [])
 
@@ -691,202 +708,110 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid gap-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-medium">12-Month Jar</h3>
-                    <Badge variant="outline" className="text-primary border-primary">
-                      Short Term
-                    </Badge>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="12-month-apy">APY Rate (%)</Label>
-                      <div className="relative">
-                        <Input id="12-month-apy" value={investmentSettings.jars['12'].apy} onChange={e => setInvestmentSettings(s => ({
+                {(Array.isArray(investmentSettings.jars) ? investmentSettings.jars : []).map((jar, index) => (
+                  <div key={index} className="space-y-4 border-b pb-4 mb-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-medium">{jar.term}-Month Jar</h3>
+                      <Badge variant="outline" className="text-primary border-primary">
+                        {jar.term <= 12 ? 'Short Term' : jar.term <= 24 ? 'Medium Term' : 'Long Term'}
+                      </Badge>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setInvestmentSettings(s => ({
                           ...s,
-                          jars: {
-                            ...s.jars,
-                            '12': { ...s.jars['12'], apy: Number(e.target.value) } }
-                        }))} type="number" min="0" max="100" step="0.1" />
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <Percent className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      </div>
+                          jars: s.jars.filter((_, i) => i !== index)
+                        }))}
+                        title="Remove term"
+                      >
+                        Remove
+                      </Button>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="12-month-min">Minimum Investment</Label>
-                      <div className="relative">
-                        <Input id="12-month-min" value={investmentSettings.jars['12'].min} onChange={e => setInvestmentSettings(s => ({
-                          ...s,
-                          jars: {
-                            ...s.jars,
-                            '12': { ...s.jars['12'], min: Number(e.target.value) } }
-                        }))} type="number" min="0" step="100" />
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        </div>
+                    <div className="grid gap-4 md:grid-cols-4">
+                      <div className="space-y-2">
+                        <Label htmlFor={`term-${index}`}>Term (months)</Label>
+                        <Input
+                          id={`term-${index}`}
+                          value={jar.term}
+                          onChange={e => setInvestmentSettings(s => ({
+                            ...s,
+                            jars: s.jars.map((j, i) => i === index ? { ...j, term: Number(e.target.value) } : j)
+                          }))}
+                          type="number"
+                          min="1"
+                        />
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="12-month-early">Early Withdrawal Fee (%)</Label>
-                      <div className="relative">
-                        <Input id="12-month-early" value={investmentSettings.jars['12'].earlyFee} onChange={e => setInvestmentSettings(s => ({
-                          ...s,
-                          jars: {
-                            ...s.jars,
-                            '12': { ...s.jars['12'], earlyFee: Number(e.target.value) } }
-                        }))} type="number" min="0" max="100" step="0.1" />
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <Percent className="h-4 w-4 text-muted-foreground" />
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`apy-${index}`}>APY Rate (%)</Label>
+                        <Input
+                          id={`apy-${index}`}
+                          value={jar.apy}
+                          onChange={e => setInvestmentSettings(s => ({
+                            ...s,
+                            jars: s.jars.map((j, i) => i === index ? { ...j, apy: Number(e.target.value) } : j)
+                          }))}
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                        />
                       </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="12-month-status" className="flex items-center justify-between">
-                      <span>Active</span>
-                      <Switch id="12-month-status" checked={investmentSettings.jars['12'].active} onCheckedChange={(checked) => setInvestmentSettings(s => ({
-                        ...s,
-                        jars: {
-                          ...s.jars,
-                          '12': { ...s.jars['12'], active: checked } }
-                      }))} />
-                    </Label>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-medium">24-Month Jar</h3>
-                    <Badge variant="outline" className="text-primary border-primary">
-                      Medium Term
-                    </Badge>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="24-month-apy">APY Rate (%)</Label>
-                      <div className="relative">
-                        <Input id="24-month-apy" value={investmentSettings.jars['24'].apy} onChange={e => setInvestmentSettings(s => ({
-                          ...s,
-                          jars: {
-                            ...s.jars,
-                            '24': { ...s.jars['24'], apy: Number(e.target.value) } }
-                        }))} type="number" min="0" max="100" step="0.1" />
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <Percent className="h-4 w-4 text-muted-foreground" />
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`min-${index}`}>Minimum Investment</Label>
+                        <Input
+                          id={`min-${index}`}
+                          value={jar.min}
+                          onChange={e => setInvestmentSettings(s => ({
+                            ...s,
+                            jars: s.jars.map((j, i) => i === index ? { ...j, min: Number(e.target.value) } : j)
+                          }))}
+                          type="number"
+                          min="0"
+                          step="100"
+                        />
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="24-month-min">Minimum Investment</Label>
-                      <div className="relative">
-                        <Input id="24-month-min" value={investmentSettings.jars['24'].min} onChange={e => setInvestmentSettings(s => ({
-                          ...s,
-                          jars: {
-                            ...s.jars,
-                            '24': { ...s.jars['24'], min: Number(e.target.value) } }
-                        }))} type="number" min="0" step="100" />
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`earlyFee-${index}`}>Early Withdrawal Fee (%)</Label>
+                        <Input
+                          id={`earlyFee-${index}`}
+                          value={jar.earlyFee}
+                          onChange={e => setInvestmentSettings(s => ({
+                            ...s,
+                            jars: s.jars.map((j, i) => i === index ? { ...j, earlyFee: Number(e.target.value) } : j)
+                          }))}
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                        />
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="24-month-early">Early Withdrawal Fee (%)</Label>
-                      <div className="relative">
-                        <Input id="24-month-early" value={investmentSettings.jars['24'].earlyFee} onChange={e => setInvestmentSettings(s => ({
-                          ...s,
-                          jars: {
-                            ...s.jars,
-                            '24': { ...s.jars['24'], earlyFee: Number(e.target.value) } }
-                        }))} type="number" min="0" max="100" step="0.1" />
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <Percent className="h-4 w-4 text-muted-foreground" />
-                        </div>
+                      <div className="space-y-2 flex items-center mt-6">
+                        <Label htmlFor={`active-${index}`}>Active</Label>
+                        <Switch
+                          id={`active-${index}`}
+                          checked={jar.active}
+                          onCheckedChange={checked => setInvestmentSettings(s => ({
+                            ...s,
+                            jars: s.jars.map((j, i) => i === index ? { ...j, active: checked } : j)
+                          }))}
+                        />
                       </div>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="24-month-status" className="flex items-center justify-between">
-                      <span>Active</span>
-                      <Switch id="24-month-status" checked={investmentSettings.jars['24'].active} onCheckedChange={(checked) => setInvestmentSettings(s => ({
-                        ...s,
-                        jars: {
-                          ...s.jars,
-                          '24': { ...s.jars['24'], active: checked } }
-                      }))} />
-                    </Label>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-medium">36-Month Jar</h3>
-                    <Badge variant="outline" className="text-primary border-primary">
-                      Long Term
-                    </Badge>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="36-month-apy">APY Rate (%)</Label>
-                      <div className="relative">
-                        <Input id="36-month-apy" value={investmentSettings.jars['36'].apy} onChange={e => setInvestmentSettings(s => ({
-                          ...s,
-                          jars: {
-                            ...s.jars,
-                            '36': { ...s.jars['36'], apy: Number(e.target.value) } }
-                        }))} type="number" min="0" max="100" step="0.1" />
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <Percent className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="36-month-min">Minimum Investment</Label>
-                      <div className="relative">
-                        <Input id="36-month-min" value={investmentSettings.jars['36'].min} onChange={e => setInvestmentSettings(s => ({
-                          ...s,
-                          jars: {
-                            ...s.jars,
-                            '36': { ...s.jars['36'], min: Number(e.target.value) } }
-                        }))} type="number" min="0" step="100" />
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="36-month-early">Early Withdrawal Fee (%)</Label>
-                      <div className="relative">
-                        <Input id="36-month-early" value={investmentSettings.jars['36'].earlyFee} onChange={e => setInvestmentSettings(s => ({
-                          ...s,
-                          jars: {
-                            ...s.jars,
-                            '36': { ...s.jars['36'], earlyFee: Number(e.target.value) } }
-                        }))} type="number" min="0" max="100" step="0.1" />
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <Percent className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="36-month-status" className="flex items-center justify-between">
-                      <span>Active</span>
-                      <Switch id="36-month-status" checked={investmentSettings.jars['36'].active} onCheckedChange={(checked) => setInvestmentSettings(s => ({
-                        ...s,
-                        jars: {
-                          ...s.jars,
-                          '36': { ...s.jars['36'], active: checked } }
-                      }))} />
-                    </Label>
-                  </div>
-                </div>
+                ))}
               </div>
+              <Button
+                variant="outline"
+                onClick={() => setInvestmentSettings(s => ({
+                  ...s,
+                  jars: [
+                    ...((Array.isArray(s.jars) ? s.jars : [])),
+                    { term: 0, apy: 0, min: 0, earlyFee: 0, active: true }
+                  ]
+                }))}
+              >
+                Add Term
+              </Button>
             </CardContent>
           </Card>
 
@@ -899,10 +824,14 @@ export default function SettingsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="interest-calculation">Interest Calculation Method</Label>
-                  <Select value={investmentSettings.interest.calculation} onValueChange={value => setInvestmentSettings(s => ({
-                    ...s,
-                    interest: { ...s.interest, calculation: value }
-                  }))} defaultValue="compound">
+                  <Select
+                    value={investmentSettings.interest.calculation}
+                    onValueChange={value => setInvestmentSettings(s => ({
+                      ...s,
+                      interest: { ...s.interest, calculation: value }
+                    }))}
+                    defaultValue="compound"
+                  >
                     <SelectTrigger id="interest-calculation">
                       <SelectValue placeholder="Select method" />
                     </SelectTrigger>
@@ -915,10 +844,14 @@ export default function SettingsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="interest-frequency">Interest Payout Frequency</Label>
-                  <Select value={investmentSettings.interest.frequency} onValueChange={value => setInvestmentSettings(s => ({
-                    ...s,
-                    interest: { ...s.interest, frequency: value }
-                  }))} defaultValue="monthly">
+                  <Select
+                    value={investmentSettings.interest.frequency}
+                    onValueChange={value => setInvestmentSettings(s => ({
+                      ...s,
+                      interest: { ...s.interest, frequency: value }
+                    }))}
+                    defaultValue="monthly"
+                  >
                     <SelectTrigger id="interest-frequency">
                       <SelectValue placeholder="Select frequency" />
                     </SelectTrigger>
@@ -942,10 +875,14 @@ export default function SettingsPage() {
                       Allow users to automatically reinvest earned interest
                     </p>
                   </div>
-                  <Switch id="auto-reinvest" checked={investmentSettings.interest.autoReinvest} onCheckedChange={(checked) => setInvestmentSettings(s => ({
-                    ...s,
-                    interest: { ...s.interest, autoReinvest: checked }
-                  }))} />
+                  <Switch
+                    id="auto-reinvest"
+                    checked={investmentSettings.interest.autoReinvest}
+                    onCheckedChange={(checked) => setInvestmentSettings(s => ({
+                      ...s,
+                      interest: { ...s.interest, autoReinvest: checked }
+                    }))}
+                  />
                 </Label>
               </div>
 
@@ -957,10 +894,14 @@ export default function SettingsPage() {
                       Allow users to withdraw funds before maturity (with penalty)
                     </p>
                   </div>
-                  <Switch id="early-withdrawal" checked={investmentSettings.interest.allowEarlyWithdrawal} onCheckedChange={(checked) => setInvestmentSettings(s => ({
-                    ...s,
-                    interest: { ...s.interest, allowEarlyWithdrawal: checked }
-                  }))} />
+                  <Switch
+                    id="early-withdrawal"
+                    checked={investmentSettings.interest.allowEarlyWithdrawal}
+                    onCheckedChange={(checked) => setInvestmentSettings(s => ({
+                      ...s,
+                      interest: { ...s.interest, allowEarlyWithdrawal: checked }
+                    }))}
+                  />
                 </Label>
               </div>
             </CardContent>
@@ -981,7 +922,11 @@ export default function SettingsPage() {
                     <span>Require Two-Factor Authentication</span>
                     <p className="text-sm text-muted-foreground">Force all users to set up 2FA for their accounts</p>
                   </div>
-                  <Switch id="two-factor" checked={securitySettings.twoFactor} onCheckedChange={(checked) => setSecuritySettings(s => ({ ...s, twoFactor: checked }))} />
+                  <Switch
+                    id="two-factor"
+                    checked={securitySettings.twoFactor}
+                    onCheckedChange={(checked) => setSecuritySettings(s => ({ ...s, twoFactor: checked }))}
+                  />
                 </Label>
               </div>
 
@@ -991,124 +936,61 @@ export default function SettingsPage() {
                     <span>Password Expiry</span>
                     <p className="text-sm text-muted-foreground">Force users to change their password periodically</p>
                   </div>
-                  <Switch id="password-expiry" checked={securitySettings.passwordExpiry} onCheckedChange={(checked) => setSecuritySettings(s => ({ ...s, passwordExpiry: checked }))} />
+                  <Switch
+                    id="password-expiry"
+                    checked={securitySettings.passwordExpiry}
+                    onCheckedChange={(checked) => setSecuritySettings(s => ({ ...s, passwordExpiry: checked }))}
+                  />
                 </Label>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="password-expiry-days">Password Expiry Days</Label>
-                  <div className="relative">
-                    <Input id="password-expiry-days" value={securitySettings.passwordExpiryDays} onChange={e => setSecuritySettings(s => ({ ...s, passwordExpiryDays: Number(e.target.value) }))} type="number" min="1" />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="session-timeout">Session Timeout (minutes)</Label>
-                  <div className="relative">
-                    <Input id="session-timeout" value={securitySettings.sessionTimeout} onChange={e => setSecuritySettings(s => ({ ...s, sessionTimeout: Number(e.target.value) }))} type="number" min="1" />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="max-login-attempts">Max Login Attempts</Label>
-                  <Input id="max-login-attempts" value={securitySettings.maxLoginAttempts} onChange={e => setSecuritySettings(s => ({ ...s, maxLoginAttempts: Number(e.target.value) }))} type="number" min="1" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lockout-duration">Account Lockout Duration (minutes)</Label>
-                  <div className="relative">
-                    <Input id="lockout-duration" value={securitySettings.lockoutDuration} onChange={e => setSecuritySettings(s => ({ ...s, lockoutDuration: Number(e.target.value) }))} type="number" min="1" />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="ip-restriction" className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <span>IP Address Restriction</span>
-                    <p className="text-sm text-muted-foreground">Restrict admin access to specific IP addresses</p>
-                  </div>
-                  <Switch id="ip-restriction" checked={securitySettings.ipRestriction} onCheckedChange={(checked) => setSecuritySettings(s => ({ ...s, ipRestriction: checked }))} />
-                </Label>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="allowed-ips">Allowed IP Addresses</Label>
-                <Textarea id="allowed-ips" value={securitySettings.allowedIps} onChange={e => setSecuritySettings(s => ({ ...s, allowedIps: e.target.value }))} placeholder="Enter IP addresses, one per line" rows={3} />
-                <p className="text-xs text-muted-foreground">
-                  Enter one IP address or CIDR range per line (e.g., 192.168.1.1 or 192.168.1.0/24)
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>KYC and Compliance</CardTitle>
-              <CardDescription>Configure Know Your Customer and compliance settings</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="kyc-required" className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <span>Require KYC Verification</span>
-                    <p className="text-sm text-muted-foreground">
-                      Require users to complete KYC verification before investing
-                    </p>
+                    <span>KYC Required</span>
+                    <p className="text-sm text-muted-foreground">Force customers to complete KYC before investing</p>
                   </div>
-                  <Switch id="kyc-required" checked={securitySettings.kycRequired} onCheckedChange={(checked) => setSecuritySettings(s => ({ ...s, kycRequired: checked }))} />
+                  <Switch
+                    id="kyc-required"
+                    checked={securitySettings.kycRequired}
+                    onCheckedChange={checked => setSecuritySettings(s => ({ ...s, kycRequired: checked }))}
+                  />
                 </Label>
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="kyc-investment-limit" className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <span>Investment Limit Without KYC</span>
-                    <p className="text-sm text-muted-foreground">
-                      Maximum investment amount allowed without KYC verification
-                    </p>
-                  </div>
-                  <div className="relative w-32">
-                    <Input id="kyc-investment-limit" value={securitySettings.kycInvestmentLimit} onChange={e => setSecuritySettings(s => ({ ...s, kycInvestmentLimit: Number(e.target.value) }))} type="number" min="0" />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                </Label>
+                <Label htmlFor="kyc-investment-limit">KYC Investment Limit</Label>
+                <Input
+                  id="kyc-investment-limit"
+                  type="number"
+                  min={0}
+                  value={securitySettings.kycInvestmentLimit}
+                  onChange={e => setSecuritySettings(s => ({ ...s, kycInvestmentLimit: Number(e.target.value) }))}
+                />
+                <p className="text-sm text-muted-foreground">Maximum investment allowed before KYC is required</p>
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="aml-screening" className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <span>AML Screening</span>
-                    <p className="text-sm text-muted-foreground">
-                      Enable Anti-Money Laundering screening for transactions
-                    </p>
+                    <p className="text-sm text-muted-foreground">Enable anti-money laundering checks</p>
                   </div>
-                  <Switch id="aml-screening" checked={securitySettings.amlScreening} onCheckedChange={(checked) => setSecuritySettings(s => ({ ...s, amlScreening: checked }))} />
+                  <Switch
+                    id="aml-screening"
+                    checked={securitySettings.amlScreening}
+                    onCheckedChange={checked => setSecuritySettings(s => ({ ...s, amlScreening: checked }))}
+                  />
                 </Label>
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="suspicious-threshold" className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <span>Suspicious Transaction Threshold</span>
-                    <p className="text-sm text-muted-foreground">Flag transactions above this amount for review</p>
-                  </div>
-                  <div className="relative w-32">
-                    <Input id="suspicious-threshold" value={securitySettings.suspiciousThreshold} onChange={e => setSecuritySettings(s => ({ ...s, suspiciousThreshold: Number(e.target.value) }))} type="number" min="0" />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                </Label>
+                <Label htmlFor="suspicious-threshold">Suspicious Transaction Threshold</Label>
+                <Input
+                  id="suspicious-threshold"
+                  type="number"
+                  min={0}
+                  value={securitySettings.suspiciousThreshold}
+                  onChange={e => setSecuritySettings(s => ({ ...s, suspiciousThreshold: Number(e.target.value) }))}
+                />
+                <p className="text-sm text-muted-foreground">Amount above which transactions are flagged for review</p>
               </div>
             </CardContent>
           </Card>
@@ -1118,135 +1000,106 @@ export default function SettingsPage() {
         <TabsContent value="notifications" className="space-y-6 pt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Email Notifications</CardTitle>
-              <CardDescription>Configure system email notification settings</CardDescription>
+              <CardTitle>Notification Settings</CardTitle>
+              <CardDescription>Configure email and SMS notification preferences</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="email-from">From Email Address</Label>
-                <Input id="email-from" value={notificationSettings.supportEmail} onChange={e => setNotificationSettings(s => ({ ...s, supportEmail: e.target.value }))} type="email" />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email-reply-to">Reply-To Email Address</Label>
-                <Input id="email-reply-to" value={notificationSettings.replyToEmail} onChange={e => setNotificationSettings(s => ({ ...s, replyToEmail: e.target.value }))} type="email" />
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium">Admin Notifications</h3>
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="admin-new-user" className="flex items-center justify-between">
-                    <span>New User Registration</span>
-                    <Switch id="admin-new-user" checked={notificationSettings.adminNewUser} onCheckedChange={(checked) => setNotificationSettings(s => ({ ...s, adminNewUser: checked }))} />
-                  </Label>
+                  <Label htmlFor="support-email">Support Email</Label>
+                  <Input id="support-email" value={notificationSettings.supportEmail} onChange={e => setNotificationSettings(s => ({ ...s, supportEmail: e.target.value }))} type="email" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="admin-large-deposit" className="flex items-center justify-between">
-                    <span>Large Deposits</span>
-                    <Switch id="admin-large-deposit" checked={notificationSettings.adminLargeDeposit} onCheckedChange={(checked) => setNotificationSettings(s => ({ ...s, adminLargeDeposit: checked }))} />
-                  </Label>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="admin-large-withdrawal" className="flex items-center justify-between">
-                    <span>Large Withdrawals</span>
-                    <Switch id="admin-large-withdrawal" checked={notificationSettings.adminLargeWithdrawal} onCheckedChange={(checked) => setNotificationSettings(s => ({ ...s, adminLargeWithdrawal: checked }))} />
-                  </Label>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="admin-support-ticket" className="flex items-center justify-between">
-                    <span>New Support Tickets</span>
-                    <Switch id="admin-support-ticket" checked={notificationSettings.adminSupportTicket} onCheckedChange={(checked) => setNotificationSettings(s => ({ ...s, adminSupportTicket: checked }))} />
-                  </Label>
+                  <Label htmlFor="reply-to-email">Reply-To Email</Label>
+                  <Input id="reply-to-email" value={notificationSettings.replyToEmail} onChange={e => setNotificationSettings(s => ({ ...s, replyToEmail: e.target.value }))} type="email" />
                 </div>
               </div>
-
               <Separator />
-
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium">Customer Notifications</h3>
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="customer-welcome" className="flex items-center justify-between">
-                    <span>Welcome Email</span>
-                    <Switch id="customer-welcome" checked={notificationSettings.customerWelcome} onCheckedChange={(checked) => setNotificationSettings(s => ({ ...s, customerWelcome: checked }))} />
-                  </Label>
+                  <Label htmlFor="sms-enabled">Enable SMS Notifications</Label>
+                  <Switch id="sms-enabled" checked={notificationSettings.smsEnabled} onCheckedChange={checked => setNotificationSettings(s => ({ ...s, smsEnabled: checked }))} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="customer-deposit" className="flex items-center justify-between">
-                    <span>Deposit Confirmation</span>
-                    <Switch id="customer-deposit" checked={notificationSettings.customerDeposit} onCheckedChange={(checked) => setNotificationSettings(s => ({ ...s, customerDeposit: checked }))} />
-                  </Label>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="customer-withdrawal" className="flex items-center justify-between">
-                    <span>Withdrawal Confirmation</span>
-                    <Switch id="customer-withdrawal" checked={notificationSettings.customerWithdrawal} onCheckedChange={(checked) => setNotificationSettings(s => ({ ...s, customerWithdrawal: checked }))} />
-                  </Label>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="customer-interest" className="flex items-center justify-between">
-                    <span>Interest Payment</span>
-                    <Switch id="customer-interest" checked={notificationSettings.customerInterest} onCheckedChange={(checked) => setNotificationSettings(s => ({ ...s, customerInterest: checked }))} />
-                  </Label>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="customer-maturity" className="flex items-center justify-between">
-                    <span>Jar Maturity Reminder</span>
-                    <Switch id="customer-maturity" checked={notificationSettings.customerMaturity} onCheckedChange={(checked) => setNotificationSettings(s => ({ ...s, customerMaturity: checked }))} />
-                  </Label>
+                  <Label htmlFor="sms-provider">SMS Provider</Label>
+                  <Select value={notificationSettings.smsProvider} onValueChange={value => setNotificationSettings(s => ({ ...s, smsProvider: value }))}>
+                    <SelectTrigger id="sms-provider">
+                      <SelectValue placeholder="Select provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="twilio">Twilio</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>SMS Notifications</CardTitle>
-              <CardDescription>Configure system SMS notification settings</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="sms-enabled" className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <span>Enable SMS Notifications</span>
-                    <p className="text-sm text-muted-foreground">Send important notifications via SMS</p>
+              <Separator />
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Admin Notifications</Label>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span>New User</span>
+                      <Switch checked={notificationSettings.adminNewUser} onCheckedChange={checked => setNotificationSettings(s => ({ ...s, adminNewUser: checked }))} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Large Deposit</span>
+                      <Switch checked={notificationSettings.adminLargeDeposit} onCheckedChange={checked => setNotificationSettings(s => ({ ...s, adminLargeDeposit: checked }))} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Large Withdrawal</span>
+                      <Switch checked={notificationSettings.adminLargeWithdrawal} onCheckedChange={checked => setNotificationSettings(s => ({ ...s, adminLargeWithdrawal: checked }))} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Support Ticket</span>
+                      <Switch checked={notificationSettings.adminSupportTicket} onCheckedChange={checked => setNotificationSettings(s => ({ ...s, adminSupportTicket: checked }))} />
+                    </div>
                   </div>
-                  <Switch id="sms-enabled" checked={notificationSettings.smsEnabled} onCheckedChange={(checked) => setNotificationSettings(s => ({ ...s, smsEnabled: checked }))} />
-                </Label>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="sms-provider">SMS Provider</Label>
-                <Select value={notificationSettings.smsProvider} onValueChange={value => setNotificationSettings(s => ({ ...s, smsProvider: value }))} defaultValue="twilio">
-                  <SelectTrigger id="sms-provider">
-                    <SelectValue placeholder="Select provider" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="twilio">Twilio</SelectItem>
-                    <SelectItem value="aws-sns">AWS SNS</SelectItem>
-                    <SelectItem value="messagebird">MessageBird</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium">SMS Notification Types</h3>
-                <div className="space-y-2">
-                  <Label htmlFor="sms-security" className="flex items-center justify-between">
-                    <span>Security Alerts</span>
-                    <Switch id="sms-security" checked={notificationSettings.smsSecurity} onCheckedChange={(checked) => setNotificationSettings(s => ({ ...s, smsSecurity: checked }))} />
-                  </Label>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="sms-transaction" className="flex items-center justify-between">
-                    <span>Transaction Confirmations</span>
-                    <Switch id="sms-transaction" checked={notificationSettings.smsTransaction} onCheckedChange={(checked) => setNotificationSettings(s => ({ ...s, smsTransaction: checked }))} />
-                  </Label>
+                  <Label>Customer Notifications</Label>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span>Welcome</span>
+                      <Switch checked={notificationSettings.customerWelcome} onCheckedChange={checked => setNotificationSettings(s => ({ ...s, customerWelcome: checked }))} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Deposit</span>
+                      <Switch checked={notificationSettings.customerDeposit} onCheckedChange={checked => setNotificationSettings(s => ({ ...s, customerDeposit: checked }))} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Withdrawal</span>
+                      <Switch checked={notificationSettings.customerWithdrawal} onCheckedChange={checked => setNotificationSettings(s => ({ ...s, customerWithdrawal: checked }))} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Interest</span>
+                      <Switch checked={notificationSettings.customerInterest} onCheckedChange={checked => setNotificationSettings(s => ({ ...s, customerInterest: checked }))} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Maturity</span>
+                      <Switch checked={notificationSettings.customerMaturity} onCheckedChange={checked => setNotificationSettings(s => ({ ...s, customerMaturity: checked }))} />
+                    </div>
+                  </div>
                 </div>
+              </div>
+              <Separator />
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="sms-marketing" className="flex items-center justify-between">
-                    <span>Marketing Messages</span>
-                    <Switch id="sms-marketing" checked={notificationSettings.smsMarketing} onCheckedChange={(checked) => setNotificationSettings(s => ({ ...s, smsMarketing: checked }))} />
-                  </Label>
+                  <Label>SMS Notifications</Label>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span>Security Alerts</span>
+                      <Switch checked={notificationSettings.smsSecurity} onCheckedChange={checked => setNotificationSettings(s => ({ ...s, smsSecurity: checked }))} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Transaction Alerts</span>
+                      <Switch checked={notificationSettings.smsTransaction} onCheckedChange={checked => setNotificationSettings(s => ({ ...s, smsTransaction: checked }))} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Marketing</span>
+                      <Switch checked={notificationSettings.smsMarketing} onCheckedChange={checked => setNotificationSettings(s => ({ ...s, smsMarketing: checked }))} />
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -1257,106 +1110,30 @@ export default function SettingsPage() {
         <TabsContent value="integrations" className="space-y-6 pt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Payment Gateways</CardTitle>
-              <CardDescription>Configure payment gateway integrations</CardDescription>
+              <CardTitle>Integrations</CardTitle>
+              <CardDescription>Configure third-party integrations</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-md bg-primary/10 p-2">
-                      <CreditCard className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-medium">Stripe</h3>
-                      <p className="text-sm text-muted-foreground">Credit card and bank transfer processing</p>
-                    </div>
-                  </div>
-                  <Switch
-                    id="stripe-enabled"
-                    checked={integrationSettings.stripe.enabled}
-                    onCheckedChange={(checked) => handleIntegrationChange('stripe', 'enabled', checked)}
-                  />
+              <div className="border rounded-lg p-4 mb-4">
+                <div className="flex items-center mb-2">
+                  <Switch id="stripe-enabled" checked={integrationSettings.stripe.enabled} onCheckedChange={checked => handleIntegrationChange('stripe', 'enabled', checked)} />
+                  <Label htmlFor="stripe-enabled" className="ml-2">Enable Stripe</Label>
                 </div>
-
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="stripe-public-key">Publishable Key</Label>
-                    <Input
-                      id="stripe-public-key"
-                      type="text"
-                      placeholder="pk_test_..."
-                      value={integrationSettings.stripe.publishableKey}
-                      onChange={(e) => handleIntegrationChange('stripe', 'publishableKey', e.target.value)}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Your Stripe publishable key (starts with pk_)
-                    </p>
+                    <Label htmlFor="stripe-publishable-key">Stripe Publishable Key</Label>
+                    <Input id="stripe-publishable-key" value={integrationSettings.stripe.publishableKey} onChange={e => handleIntegrationChange('stripe', 'publishableKey', e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="stripe-secret-key">Secret Key</Label>
-                    <Input
-                      id="stripe-secret-key"
-                      type="password"
-                      placeholder="sk_test_..."
-                      value={integrationSettings.stripe.secretKey}
-                      onChange={(e) => handleIntegrationChange('stripe', 'secretKey', e.target.value)}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Your Stripe secret key (starts with sk_)
-                    </p>
+                    <Label htmlFor="stripe-secret-key">Stripe Secret Key</Label>
+                    <Input id="stripe-secret-key" value={integrationSettings.stripe.secretKey} onChange={e => handleIntegrationChange('stripe', 'secretKey', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="stripe-webhook-secret">Stripe Webhook Secret</Label>
+                    <Input id="stripe-webhook-secret" value={integrationSettings.stripe.webhookSecret} onChange={e => handleIntegrationChange('stripe', 'webhookSecret', e.target.value)} />
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="stripe-webhook-secret">Webhook Secret</Label>
-                  <Input
-                    id="stripe-webhook-secret"
-                    type="password"
-                    placeholder="whsec_..."
-                    value={integrationSettings.stripe.webhookSecret}
-                    onChange={(e) => handleIntegrationChange('stripe', 'webhookSecret', e.target.value)}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Your Stripe webhook signing secret (starts with whsec_)
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-sm font-medium">Payment Methods</h4>
-                  <div className="space-y-2">
-                    <Label htmlFor="stripe-cards" className="flex items-center justify-between">
-                      <span>Credit & Debit Cards</span>
-                      <Switch
-                        id="stripe-cards"
-                        checked={integrationSettings.stripe.paymentMethods.cards}
-                        onCheckedChange={() => handleIntegrationPaymentMethodChange('cards')}
-                      />
-                    </Label>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="stripe-ach" className="flex items-center justify-between">
-                      <span>ACH Direct Debit (US)</span>
-                      <Switch
-                        id="stripe-ach"
-                        checked={integrationSettings.stripe.paymentMethods.ach}
-                        onCheckedChange={() => handleIntegrationPaymentMethodChange('ach')}
-                      />
-                    </Label>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="stripe-sepa" className="flex items-center justify-between">
-                      <span>SEPA Direct Debit (EU)</span>
-                      <Switch
-                        id="stripe-sepa"
-                        checked={integrationSettings.stripe.paymentMethods.sepa}
-                        onCheckedChange={() => handleIntegrationPaymentMethodChange('sepa')}
-                      />
-                    </Label>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
+                <div className="space-y-2 mt-4">
                   <Label>Webhook Endpoint</Label>
                   <div className="p-4 bg-muted rounded-lg">
                     <code className="text-sm break-all">
@@ -1367,384 +1144,152 @@ export default function SettingsPage() {
                     Use this URL in your Stripe Dashboard webhook settings
                   </p>
                 </div>
-
-                <Button
-                  onClick={handleSaveStripeSettings}
-                  disabled={saving}
-                >
-                  {saving ? 'Saving...' : 'Save Stripe Settings'}
-                </Button>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>SMTP Configuration</CardTitle>
-              <CardDescription>Configure SMTP settings for sending emails</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="smtp-enabled"
-                  checked={smtpConfig.enabled}
-                  onCheckedChange={(checked) => handleSMTPChange('enabled', checked)}
-                />
-                <Label htmlFor="smtp-enabled">Enable SMTP</Label>
-              </div>
-
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="smtp-host">SMTP Host</Label>
-                  <Input
-                    id="smtp-host"
-                    value={smtpConfig.host}
-                    onChange={(e) => handleSMTPChange('host', e.target.value)}
-                  />
+              <div className="border rounded-lg p-4 mb-4">
+                <div className="flex items-center mb-2">
+                  <Switch id="twilio-enabled" checked={integrationSettings.twilio.enabled} onCheckedChange={checked => handleIntegrationChange('twilio', 'enabled', checked)} />
+                  <Label htmlFor="twilio-enabled" className="ml-2">Enable Twilio</Label>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="smtp-port">SMTP Port</Label>
-                  <Input
-                    id="smtp-port"
-                    type="number"
-                    value={smtpConfig.port}
-                    onChange={(e) => handleSMTPChange('port', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="smtp-secure">Use SSL/TLS</Label>
-                  <Switch
-                    id="smtp-secure"
-                    checked={smtpConfig.secure}
-                    onCheckedChange={(checked) => handleSMTPChange('secure', checked)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="smtp-user">Username</Label>
-                  <Input
-                    id="smtp-user"
-                    value={smtpConfig.user}
-                    onChange={(e) => handleSMTPChange('user', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="smtp-pass">Password</Label>
-                  <Input
-                    id="smtp-pass"
-                    type="password"
-                    value={smtpConfig.pass}
-                    onChange={(e) => handleSMTPChange('pass', e.target.value)}
-                  />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="twilio-account-sid">Twilio Account SID</Label>
+                    <Input id="twilio-account-sid" value={integrationSettings.twilio.accountSid} onChange={e => handleIntegrationChange('twilio', 'accountSid', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="twilio-auth-token">Twilio Auth Token</Label>
+                    <Input id="twilio-auth-token" value={integrationSettings.twilio.authToken} onChange={e => handleIntegrationChange('twilio', 'authToken', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="twilio-phone-number">Twilio Phone Number</Label>
+                    <Input id="twilio-phone-number" value={integrationSettings.twilio.phoneNumber} onChange={e => handleIntegrationChange('twilio', 'phoneNumber', e.target.value)} />
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Gmail Configuration</CardTitle>
-              <CardDescription>Configure Gmail API settings for sending emails</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="gmail-enabled"
-                  checked={gmailConfig.enabled}
-                  onCheckedChange={(checked) => handleGmailChange('enabled', checked)}
-                />
-                <Label htmlFor="gmail-enabled">Enable Gmail</Label>
-              </div>
-
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="gmail-client-id">Client ID</Label>
-                  <Input
-                    id="gmail-client-id"
-                    value={gmailConfig.clientId}
-                    onChange={(e) => handleGmailChange('clientId', e.target.value)}
-                  />
+              <div className="border rounded-lg p-4 mb-4">
+                <div className="flex items-center mb-2">
+                  <Switch id="recaptcha-enabled" checked={integrationSettings.recaptcha.enabled} onCheckedChange={checked => handleIntegrationChange('recaptcha', 'enabled', checked)} />
+                  <Label htmlFor="recaptcha-enabled" className="ml-2">Enable reCAPTCHA</Label>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="gmail-client-secret">Client Secret</Label>
-                  <Input
-                    id="gmail-client-secret"
-                    type="password"
-                    value={gmailConfig.clientSecret}
-                    onChange={(e) => handleGmailChange('clientSecret', e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="gmail-refresh-token">Refresh Token</Label>
-                  <Input
-                    id="gmail-refresh-token"
-                    type="password"
-                    value={gmailConfig.refreshToken}
-                    onChange={(e) => handleGmailChange('refreshToken', e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="gmail-user">Gmail Address</Label>
-                  <Input
-                    id="gmail-user"
-                    type="email"
-                    value={gmailConfig.user}
-                    onChange={(e) => handleGmailChange('user', e.target.value)}
-                  />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="recaptcha-site-key">reCAPTCHA Site Key</Label>
+                    <Input id="recaptcha-site-key" value={integrationSettings.recaptcha.siteKey} onChange={e => handleIntegrationChange('recaptcha', 'siteKey', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="recaptcha-secret-key">reCAPTCHA Secret Key</Label>
+                    <Input id="recaptcha-secret-key" value={integrationSettings.recaptcha.secretKey} onChange={e => handleIntegrationChange('recaptcha', 'secretKey', e.target.value)} />
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Microsoft Configuration</CardTitle>
-              <CardDescription>Configure Microsoft 365 API settings for sending emails</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="microsoft-enabled"
-                  checked={microsoftConfig.enabled}
-                  onCheckedChange={(checked) => handleMicrosoftChange('enabled', checked)}
-                />
-                <Label htmlFor="microsoft-enabled">Enable Microsoft 365</Label>
+              <div className="border rounded-lg p-4 mb-4">
+                <div className="flex items-center mb-2">
+                  <Switch id="pusher-enabled" checked={integrationSettings.pusher.enabled} onCheckedChange={checked => handleIntegrationChange('pusher', 'enabled', checked)} />
+                  <Label htmlFor="pusher-enabled" className="ml-2">Enable Pusher</Label>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="pusher-app-id">Pusher App ID</Label>
+                    <Input id="pusher-app-id" value={integrationSettings.pusher.appId} onChange={e => handleIntegrationChange('pusher', 'appId', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pusher-key">Pusher Key</Label>
+                    <Input id="pusher-key" value={integrationSettings.pusher.key} onChange={e => handleIntegrationChange('pusher', 'key', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pusher-secret">Pusher Secret</Label>
+                    <Input id="pusher-secret" value={integrationSettings.pusher.secret} onChange={e => handleIntegrationChange('pusher', 'secret', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pusher-cluster">Pusher Cluster</Label>
+                    <Input id="pusher-cluster" value={integrationSettings.pusher.cluster} onChange={e => handleIntegrationChange('pusher', 'cluster', e.target.value)} />
+                  </div>
+                </div>
+                <div className="space-y-2 mt-4">
+                  <Label>Webhook Endpoint</Label>
+                  <div className="p-4 bg-muted rounded-lg">
+                    <code className="text-sm break-all">
+                      {`${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/pusher`}
+                    </code>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Use this URL in your Pusher Dashboard webhook settings
+                  </p>
+                </div>
               </div>
-
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="microsoft-client-id">Client ID</Label>
-                  <Input
-                    id="microsoft-client-id"
-                    value={microsoftConfig.clientId}
-                    onChange={(e) => handleMicrosoftChange('clientId', e.target.value)}
-                  />
+              <div className="border rounded-lg p-4 mb-4">
+                <div className="flex items-center mb-2">
+                  <Switch id="smtp-enabled" checked={smtpConfig.enabled} onCheckedChange={checked => handleSMTPChange('enabled', checked)} />
+                  <Label htmlFor="smtp-enabled" className="ml-2">Enable SMTP</Label>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="microsoft-client-secret">Client Secret</Label>
-                  <Input
-                    id="microsoft-client-secret"
-                    type="password"
-                    value={microsoftConfig.clientSecret}
-                    onChange={(e) => handleMicrosoftChange('clientSecret', e.target.value)}
-                  />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="smtp-host">SMTP Host</Label>
+                    <Input id="smtp-host" value={smtpConfig.host} onChange={e => handleSMTPChange('host', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="smtp-port">SMTP Port</Label>
+                    <Input id="smtp-port" type="number" value={smtpConfig.port} onChange={e => handleSMTPChange('port', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="smtp-secure">Use SSL/TLS</Label>
+                    <Switch id="smtp-secure" checked={smtpConfig.secure} onCheckedChange={checked => handleSMTPChange('secure', checked)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="smtp-user">Username</Label>
+                    <Input id="smtp-user" value={smtpConfig.user} onChange={e => handleSMTPChange('user', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="smtp-pass">Password</Label>
+                    <Input id="smtp-pass" type="password" value={smtpConfig.pass} onChange={e => handleSMTPChange('pass', e.target.value)} />
+                  </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="microsoft-tenant-id">Tenant ID</Label>
-                  <Input
-                    id="microsoft-tenant-id"
-                    value={microsoftConfig.tenantId}
-                    onChange={(e) => handleMicrosoftChange('tenantId', e.target.value)}
-                  />
+              </div>
+              <div className="border rounded-lg p-4 mb-4">
+                <div className="flex items-center mb-2">
+                  <Switch id="gmail-enabled" checked={gmailConfig.enabled} onCheckedChange={checked => handleGmailChange('enabled', checked)} />
+                  <Label htmlFor="gmail-enabled" className="ml-2">Enable Gmail</Label>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="gmail-client-id">Client ID</Label>
+                    <Input id="gmail-client-id" value={gmailConfig.clientId} onChange={e => handleGmailChange('clientId', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gmail-client-secret">Client Secret</Label>
+                    <Input id="gmail-client-secret" type="password" value={gmailConfig.clientSecret} onChange={e => handleGmailChange('clientSecret', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gmail-refresh-token">Refresh Token</Label>
+                    <Input id="gmail-refresh-token" type="password" value={gmailConfig.refreshToken} onChange={e => handleGmailChange('refreshToken', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gmail-user">Gmail Address</Label>
+                    <Input id="gmail-user" type="email" value={gmailConfig.user} onChange={e => handleGmailChange('user', e.target.value)} />
+                  </div>
+                </div>
+              </div>
+              <div className="border rounded-lg p-4 mb-4">
+                <div className="flex items-center mb-2">
+                  <Switch id="microsoft-enabled" checked={microsoftConfig.enabled} onCheckedChange={checked => handleMicrosoftChange('enabled', checked)} />
+                  <Label htmlFor="microsoft-enabled" className="ml-2">Enable Microsoft 365</Label>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="microsoft-client-id">Client ID</Label>
+                    <Input id="microsoft-client-id" value={microsoftConfig.clientId} onChange={e => handleMicrosoftChange('clientId', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="microsoft-client-secret">Client Secret</Label>
+                    <Input id="microsoft-client-secret" type="password" value={microsoftConfig.clientSecret} onChange={e => handleMicrosoftChange('clientSecret', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="microsoft-tenant-id">Tenant ID</Label>
+                    <Input id="microsoft-tenant-id" value={microsoftConfig.tenantId} onChange={e => handleMicrosoftChange('tenantId', e.target.value)} />
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Twilio Configuration</CardTitle>
-              <CardDescription>Configure Twilio API settings for sending SMS notifications</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="twilio-enabled"
-                  checked={integrationSettings.twilio.enabled}
-                  onCheckedChange={(checked) => handleIntegrationChange('twilio', 'enabled', checked)}
-                />
-                <Label htmlFor="twilio-enabled">Enable Twilio</Label>
-              </div>
-
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="twilio-account-sid">Account SID</Label>
-                  <Input
-                    id="twilio-account-sid"
-                    value={integrationSettings.twilio.accountSid}
-                    onChange={(e) => handleIntegrationChange('twilio', 'accountSid', e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="twilio-auth-token">Auth Token</Label>
-                  <Input
-                    id="twilio-auth-token"
-                    type="password"
-                    value={integrationSettings.twilio.authToken}
-                    onChange={(e) => handleIntegrationChange('twilio', 'authToken', e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="twilio-phone-number">Phone Number</Label>
-                  <Input
-                    id="twilio-phone-number"
-                    value={integrationSettings.twilio.phoneNumber}
-                    onChange={(e) => handleIntegrationChange('twilio', 'phoneNumber', e.target.value)}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>reCAPTCHA Configuration</CardTitle>
-              <CardDescription>Configure reCAPTCHA API settings for bot protection</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="recaptcha-enabled"
-                  checked={integrationSettings.recaptcha.enabled}
-                  onCheckedChange={(checked) => handleIntegrationChange('recaptcha', 'enabled', checked)}
-                />
-                <Label htmlFor="recaptcha-enabled">Enable reCAPTCHA</Label>
-              </div>
-
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="recaptcha-site-key">Site Key</Label>
-                  <Input
-                    id="recaptcha-site-key"
-                    value={integrationSettings.recaptcha.siteKey}
-                    onChange={(e) => handleIntegrationChange('recaptcha', 'siteKey', e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="recaptcha-secret-key">Secret Key</Label>
-                  <Input
-                    id="recaptcha-secret-key"
-                    type="password"
-                    value={integrationSettings.recaptcha.secretKey}
-                    onChange={(e) => handleIntegrationChange('recaptcha', 'secretKey', e.target.value)}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Pusher Configuration</CardTitle>
-              <CardDescription>Configure Pusher API settings for real-time notifications</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="pusher-enabled"
-                  checked={integrationSettings.pusher.enabled}
-                  onCheckedChange={(checked) => handleIntegrationChange('pusher', 'enabled', checked)}
-                />
-                <Label htmlFor="pusher-enabled">Enable Pusher</Label>
-              </div>
-
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="pusher-app-id">App ID</Label>
-                  <Input
-                    id="pusher-app-id"
-                    value={integrationSettings.pusher.appId}
-                    onChange={(e) => handleIntegrationChange('pusher', 'appId', e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="pusher-key">Key</Label>
-                  <Input
-                    id="pusher-key"
-                    value={integrationSettings.pusher.key}
-                    onChange={(e) => handleIntegrationChange('pusher', 'key', e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="pusher-secret">Secret</Label>
-                  <Input
-                    id="pusher-secret"
-                    type="password"
-                    value={integrationSettings.pusher.secret}
-                    onChange={(e) => handleIntegrationChange('pusher', 'secret', e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="pusher-cluster">Cluster</Label>
-                  <Select 
-                    value={integrationSettings.pusher.cluster}
-                    onValueChange={(value) => handleIntegrationChange('pusher', 'cluster', value)}
-                  >
-                    <SelectTrigger id="pusher-cluster">
-                      <SelectValue placeholder="Select cluster" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="mt1">mt1 (US East)</SelectItem>
-                      <SelectItem value="us2">us2 (US West)</SelectItem>
-                      <SelectItem value="us3">us3 (US Central)</SelectItem>
-                      <SelectItem value="eu">eu (Europe)</SelectItem>
-                      <SelectItem value="ap1">ap1 (Asia Pacific)</SelectItem>
-                      <SelectItem value="ap2">ap2 (Asia Pacific 2)</SelectItem>
-                      <SelectItem value="ap3">ap3 (Asia Pacific 3)</SelectItem>
-                      <SelectItem value="ap4">ap4 (Asia Pacific 4)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex gap-4 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={handleTestPusherConnection}
-                  disabled={testingConnection || !integrationSettings.pusher.appId || !integrationSettings.pusher.key || !integrationSettings.pusher.secret || !integrationSettings.pusher.cluster}
-                >
-                  {testingConnection ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <TestTube className="mr-2 h-4 w-4" />
-                  )}
-                  Test Connection
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  onClick={handleSendTestNotification}
-                  disabled={sendingTestNotification || !integrationSettings.pusher.appId || !integrationSettings.pusher.key || !integrationSettings.pusher.secret || !integrationSettings.pusher.cluster}
-                >
-                  {sendingTestNotification ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <BellRing className="mr-2 h-4 w-4" />
-                  )}
-                  Send Test Notification
-                </Button>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Webhook Endpoint</Label>
-                <div className="p-4 bg-muted rounded-lg">
-                  <code className="text-sm break-all">
-                    {`${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/pusher`}
-                  </code>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Use this URL in your Pusher Dashboard webhook settings
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Button
-            onClick={handleSaveIntegrations}
-            disabled={saving}
-          >
-            {saving ? 'Saving...' : 'Save Integration Settings'}
-          </Button>
         </TabsContent>
       </Tabs>
     </div>

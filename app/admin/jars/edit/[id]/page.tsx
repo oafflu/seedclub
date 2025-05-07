@@ -37,7 +37,6 @@ const formSchema = z.object({
   description: z.string().min(10, { message: "Description must be at least 10 characters" }),
   minimumAmount: z.coerce.number().min(10, { message: "Minimum investment must be at least $10" }),
   maximumAmount: z.coerce.number().min(0).optional(),
-  earlyWithdrawalPenalty: z.coerce.number().min(0).max(100).optional(),
   status: z.boolean(),
   iconType: z.enum(["upload", "default"]),
   iconFile: z.any().optional(),
@@ -91,7 +90,6 @@ export default function EditJarPage({ params }: { params: Promise<{ id: string }
       description: "",
       minimumAmount: 1000,
       maximumAmount: undefined,
-      earlyWithdrawalPenalty: undefined,
       status: true,
       iconType: "default",
       iconFile: undefined,
@@ -121,7 +119,6 @@ export default function EditJarPage({ params }: { params: Promise<{ id: string }
           description: jar.description,
           minimumAmount: jar.minimum_investment,
           maximumAmount: jar.maximum_investment || undefined,
-          earlyWithdrawalPenalty: jar.early_withdrawal_penalty || undefined,
           status: jar.is_active,
           iconType: "default",
           iconName: jar.icon_name || "PiggyBank",
@@ -197,17 +194,6 @@ export default function EditJarPage({ params }: { params: Promise<{ id: string }
   const onSubmit = async (values: FormValues) => {
     try {
       setIsLoading(true)
-      // Prepare jar data based on selected term
-      const termMonths = parseInt(selectedTab.split('-')[0])
-      const interestRate = termMonths === 12 ? 10 : termMonths === 24 ? 12 : 15
-
-      let iconName = values.iconName
-      let iconType = values.iconType
-      let iconFile = undefined;
-      if (values.iconType === 'upload' && previewIcon) {
-        iconFile = previewIcon;
-      }
-
       const response = await fetch(`/api/admin/jars/${resolvedParams.id}`, {
         method: 'PUT',
         headers: {
@@ -215,11 +201,6 @@ export default function EditJarPage({ params }: { params: Promise<{ id: string }
         },
         body: JSON.stringify({
           ...values,
-          termMonths,
-          interestRate,
-          iconName,
-          iconType,
-          iconFile,
         }),
       })
 
@@ -356,82 +337,6 @@ export default function EditJarPage({ params }: { params: Promise<{ id: string }
                       </FormItem>
                     )}
                   />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="earlyWithdrawalPenalty"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Early Withdrawal Penalty % (Optional)</FormLabel>
-                      <FormControl>
-                        <Input type="number" min={0} max={100} placeholder="5" {...field} />
-                      </FormControl>
-                      <FormDescription>Penalty percentage for early withdrawals</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-lg font-medium">Term and Interest Rate</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Select the investment term and view the corresponding interest rate
-                    </p>
-                  </div>
-
-                  <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="12-month">12 Months (10% APY)</TabsTrigger>
-                      <TabsTrigger value="24-month">24 Months (12% APY)</TabsTrigger>
-                      <TabsTrigger value="36-month">36 Months (15% APY)</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="12-month">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>12-Month Term</CardTitle>
-                          <CardDescription>Short-term investment with 10% APY</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">10% APY</div>
-                          <p className="text-sm text-muted-foreground">
-                            Perfect for short-term savings goals
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-                    <TabsContent value="24-month">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>24-Month Term</CardTitle>
-                          <CardDescription>Medium-term investment with 12% APY</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">12% APY</div>
-                          <p className="text-sm text-muted-foreground">
-                            Balanced option for medium-term growth
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-                    <TabsContent value="36-month">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>36-Month Term</CardTitle>
-                          <CardDescription>Long-term investment with 15% APY</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">15% APY</div>
-                          <p className="text-sm text-muted-foreground">
-                            Maximum returns for long-term investors
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-                  </Tabs>
                 </div>
 
                 <Separator />
