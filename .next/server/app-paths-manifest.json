@@ -1,10 +1,7 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/api/support/route": "app/api/support/route.js",
-  "/auth/login/page": "app/auth/login/page.js",
   "/mobile/dashboard/page": "app/mobile/dashboard/page.js",
-  "/mobile/support/page": "app/mobile/support/page.js",
-  "/mobile/page": "app/mobile/page.js",
-  "/mobile/profile/page": "app/mobile/profile/page.js",
-  "/mobile/profile/payment-methods/page": "app/mobile/profile/payment-methods/page.js"
+  "/mobile/invest/page": "app/mobile/invest/page.js",
+  "/mobile/wallet/page": "app/mobile/wallet/page.js",
+  "/mobile/profile/page": "app/mobile/profile/page.js"
 }
