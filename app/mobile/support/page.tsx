@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { ChevronLeft, Send, MessageSquare, Phone, Mail, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -17,6 +17,34 @@ export default function SupportPage() {
   const { toast } = useToast()
   const [message, setMessage] = useState("")
   const [subject, setSubject] = useState("")
+  const [tickets, setTickets] = useState<any[]>([])
+  const [loadingTickets, setLoadingTickets] = useState(false)
+  const [selectedTicket, setSelectedTicket] = useState<any>(null)
+  const [reply, setReply] = useState("")
+  const [messages, setMessages] = useState<any[]>([])
+  const [loadingMessages, setLoadingMessages] = useState(false)
+
+  // Fetch tickets for 'My Tickets' tab
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setLoadingTickets(true)
+      fetch("/api/support")
+        .then((res) => res.json())
+        .then((data) => setTickets(data.tickets || []))
+        .finally(() => setLoadingTickets(false))
+    }
+  }, [])
+
+  // Fetch messages for selected ticket
+  useEffect(() => {
+    if (selectedTicket) {
+      setLoadingMessages(true)
+      fetch(`/api/support/messages?ticket_id=${selectedTicket.id}`)
+        .then((res) => res.json())
+        .then((data) => setMessages(data.messages || []))
+        .finally(() => setLoadingMessages(false))
+    }
+  }, [selectedTicket])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,6 +54,26 @@ export default function SupportPage() {
     })
     setMessage("")
     setSubject("")
+  }
+
+  const handleReply = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!reply.trim()) return
+    const res = await fetch("/api/support", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticket_id: selectedTicket.id, message: reply }),
+    })
+    if (res.ok) {
+      setReply("")
+      // Refresh messages
+      fetch(`/api/support/messages?ticket_id=${selectedTicket.id}`)
+        .then((res) => res.json())
+        .then((data) => setMessages(data.messages || []))
+      toast({ title: "Reply sent" })
+    } else {
+      toast({ title: "Error", description: "Failed to send reply", variant: "destructive" })
+    }
   }
 
   return (
@@ -40,9 +88,10 @@ export default function SupportPage() {
       </div>
 
       <Tabs defaultValue="contact" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="contact">Contact Us</TabsTrigger>
           <TabsTrigger value="faq">FAQs</TabsTrigger>
+          <TabsTrigger value="my-tickets">My Tickets</TabsTrigger>
         </TabsList>
 
         <TabsContent value="contact" className="mt-4 space-y-4">
@@ -174,6 +223,80 @@ export default function SupportPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="my-tickets" className="mt-4 space-y-4">
+          <div>
+            <Card>
+              <CardHeader>
+                <CardTitle>My Tickets</CardTitle>
+                <CardDescription>Manage and view your support tickets.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingTickets ? (
+                  <div className="text-center text-muted-foreground">Loading tickets...</div>
+                ) : tickets.length === 0 ? (
+                  <div className="text-center text-muted-foreground">No tickets found.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {tickets.map((ticket) => (
+                      <Card key={ticket.id} className="border p-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{ticket.subject}</div>
+                            <div className="text-xs text-muted-foreground">Status: {ticket.status}</div>
+                          </div>
+                          <Button size="sm" variant="outline" onClick={() => setSelectedTicket(ticket)}>
+                            View
+                          </Button>
+                        </div>
+                        {selectedTicket && selectedTicket.id === ticket.id && (
+                          <div className="mt-4 border-t pt-2">
+                            <div className="mb-2 text-sm text-muted-foreground">Category: {ticket.category} | Priority: {ticket.priority}</div>
+                            <div className="mb-2 text-sm">{ticket.description}</div>
+                            <div className="mb-2 text-xs text-muted-foreground">Created: {new Date(ticket.created_at).toLocaleString()}</div>
+                            <div className="font-semibold mb-1">Messages</div>
+                            {loadingMessages ? (
+                              <div className="text-xs text-muted-foreground">Loading messages...</div>
+                            ) : messages.length === 0 ? (
+                              <div className="text-xs text-muted-foreground">No messages yet.</div>
+                            ) : (
+                              <div className="space-y-2 max-h-40 overflow-y-auto">
+                                {messages.map((msg) => (
+                                  <div key={msg.id} className={`rounded p-2 text-sm ${msg.sender_type === 'customer' ? 'bg-primary/10 text-primary' : 'bg-muted'}`}>
+                                    <div>{msg.message}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">{new Date(msg.created_at).toLocaleString()}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {ticket.status !== 'closed' && (
+                              <form onSubmit={handleReply} className="mt-2 flex gap-2">
+                                <Input
+                                  value={reply}
+                                  onChange={(e) => setReply(e.target.value)}
+                                  placeholder="Type your reply..."
+                                  className="flex-1"
+                                  required
+                                />
+                                <Button type="submit" disabled={!reply.trim()}><Send className="h-4 w-4 mr-1" />Send</Button>
+                              </form>
+                            )}
+                            {ticket.status === 'closed' && (
+                              <div className="mt-2 text-xs text-muted-foreground">This ticket is closed. You cannot reply.</div>
+                            )}
+                            <div className="mt-2">
+                              <Button size="sm" variant="ghost" onClick={() => setSelectedTicket(null)}>Hide</Button>
+                            </div>
+                          </div>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

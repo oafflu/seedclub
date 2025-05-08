@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Search,
   Filter,
@@ -41,132 +41,73 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
+// @ts-ignore
+import { saveAs } from "file-saver"
+// @ts-ignore
+import Papa from "papaparse"
+import * as XLSX from "xlsx"
+import Link from "next/link"
+import { supabase } from '@/lib/supabase/client'
 
-// Mock data for support tickets
-const tickets = [
-  {
-    id: "TICKET-001",
-    customerId: "CUST-001",
-    customerName: "John Smith",
-    subject: "Withdrawal Issue",
-    description: "I'm having trouble withdrawing funds from my account. The transaction has been pending for 3 days.",
-    status: "open",
-    priority: "high",
-    category: "account",
-    createdAt: "2024-01-15T10:30:00Z",
-    updatedAt: "2024-01-15T14:45:00Z",
-    assignedTo: "Agent Smith",
-  },
-  {
-    id: "TICKET-002",
-    customerId: "CUST-002",
-    customerName: "Sarah Johnson",
-    subject: "Interest Rate Question",
-    description: "I'd like to understand how the interest rates are calculated for the 24-month investment jar.",
-    status: "open",
-    priority: "medium",
-    category: "investment",
-    createdAt: "2024-01-16T09:15:00Z",
-    updatedAt: "2024-01-16T11:20:00Z",
-    assignedTo: null,
-  },
-  {
-    id: "TICKET-003",
-    customerId: "CUST-003",
-    customerName: "Michael Chen",
-    subject: "Account Verification",
-    description: "I submitted my verification documents 5 days ago but my account is still not verified.",
-    status: "in-progress",
-    priority: "medium",
-    category: "kyc",
-    createdAt: "2024-01-14T16:45:00Z",
-    updatedAt: "2024-01-17T09:30:00Z",
-    assignedTo: "Agent Johnson",
-  },
-  {
-    id: "TICKET-004",
-    customerId: "CUST-004",
-    customerName: "Emily Davis",
-    subject: "Referral Bonus Missing",
-    description: "I referred my friend who created an account and invested, but I haven't received my referral bonus.",
-    status: "open",
-    priority: "low",
-    category: "referral",
-    createdAt: "2024-01-17T13:20:00Z",
-    updatedAt: "2024-01-17T13:20:00Z",
-    assignedTo: null,
-  },
-  {
-    id: "TICKET-005",
-    customerId: "CUST-005",
-    customerName: "Robert Wilson",
-    subject: "App Login Issue",
-    description:
-      "I'm unable to log in to the mobile app. It keeps saying 'Invalid credentials' even though I'm sure my password is correct.",
-    status: "in-progress",
-    priority: "high",
-    category: "technical",
-    createdAt: "2024-01-16T15:10:00Z",
-    updatedAt: "2024-01-17T10:45:00Z",
-    assignedTo: "Agent Brown",
-  },
-  {
-    id: "TICKET-006",
-    customerId: "CUST-006",
-    customerName: "Jennifer Lee",
-    subject: "Early Withdrawal Request",
-    description:
-      "I need to withdraw my investment early due to a family emergency. What are the penalties and process?",
-    status: "closed",
-    priority: "medium",
-    category: "investment",
-    createdAt: "2024-01-12T11:30:00Z",
-    updatedAt: "2024-01-15T16:20:00Z",
-    assignedTo: "Agent Smith",
-    resolution: "Explained early withdrawal process and penalties. Customer proceeded with partial withdrawal.",
-  },
-  {
-    id: "TICKET-007",
-    customerId: "CUST-007",
-    customerName: "David Brown",
-    subject: "Investment Strategy Advice",
-    description: "I'd like some advice on which investment jar would be best for my retirement goals.",
-    status: "closed",
-    priority: "low",
-    category: "investment",
-    createdAt: "2024-01-13T14:25:00Z",
-    updatedAt: "2024-01-16T09:50:00Z",
-    assignedTo: "Agent Johnson",
-    resolution: "Provided detailed comparison of investment options. Customer chose the 36-month jar.",
-  },
-  {
-    id: "TICKET-008",
-    customerId: "CUST-008",
-    customerName: "Lisa Martinez",
-    subject: "Tax Documentation",
-    description: "I need tax documents for my investments for the 2023 tax year.",
-    status: "open",
-    priority: "medium",
-    category: "account",
-    createdAt: "2024-01-17T16:40:00Z",
-    updatedAt: "2024-01-17T16:40:00Z",
-    assignedTo: null,
-  },
-]
+// Add for messages
+interface SupportMessage {
+  id: string
+  sender_type: string
+  sender_id: string
+  message: string
+  created_at: string
+}
 
 export default function SupportPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedTickets, setSelectedTickets] = useState<string[]>([])
   const [viewTicket, setViewTicket] = useState<any>(null)
   const [activeTab, setActiveTab] = useState("all")
+  const [tickets, setTickets] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [filters, setFilters] = useState({ high: false, unassigned: false, recent: false })
+  const [sort, setSort] = useState({ field: "created_at", order: "desc" })
+  const [messages, setMessages] = useState<SupportMessage[]>([])
+  const [newMessage, setNewMessage] = useState("")
+  const [messagesLoading, setMessagesLoading] = useState(false)
+  const [currentAdminId, setCurrentAdminId] = useState<string | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
+
+  // Fetch tickets from API
+  const fetchTickets = () => {
+    setLoading(true)
+    const params = new URLSearchParams()
+    if (activeTab !== "all") params.append("status", activeTab)
+    if (filters.high) params.append("priority", "high")
+    if (filters.unassigned) params.append("assigned", "unassigned")
+    if (filters.recent) params.append("recent", "1")
+    if (searchTerm) params.append("search", searchTerm)
+    if (sort.field) params.append("sort", sort.field)
+    if (sort.order) params.append("order", sort.order)
+    fetch(`/api/admin/support?${params.toString()}`)
+      .then((res) => res.json())
+      .then((data) => {
+        // Map assigned_to to assignedTo for UI
+        const mapped = (data.tickets || []).map((t: any) => ({
+          ...t,
+          assignedTo: t.assigned_to ?? t.assignedTo,
+        }))
+        setTickets(mapped)
+        console.log('Fetched tickets:', mapped)
+      })
+      .finally(() => setLoading(false))
+  }
+  useEffect(fetchTickets, [activeTab, filters, searchTerm, sort])
 
   const filteredTickets = tickets
-    .filter(
-      (ticket) =>
-        ticket.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ticket.id.toLowerCase().includes(searchTerm.toLowerCase()),
-    )
+    .filter((ticket) => {
+      if (!searchTerm) return true
+      return (
+        (ticket.customerName ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (ticket.subject ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (ticket.id ?? "").toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    })
     .filter((ticket) => {
       if (activeTab === "all") return true
       if (activeTab === "open") return ticket.status === "open"
@@ -174,6 +115,8 @@ export default function SupportPage() {
       if (activeTab === "closed") return ticket.status === "closed"
       return true
     })
+  // Debug log
+  console.log('Filtered tickets:', filteredTickets)
 
   const toggleTicketSelection = (ticketId: string) => {
     setSelectedTickets((prev) => (prev.includes(ticketId) ? prev.filter((id) => id !== ticketId) : [...prev, ticketId]))
@@ -199,13 +142,178 @@ export default function SupportPage() {
     return date.toLocaleString()
   }
 
+  // Filter handlers
+  const handleFilterChange = (name: string, checked: boolean) => {
+    setFilters((prev) => ({ ...prev, [name]: checked }))
+  }
+
+  // Sorting handler (add clickable headers if needed)
+  // Example: onClick={() => setSort({ field: 'created_at', order: sort.order === 'asc' ? 'desc' : 'asc' })}
+
+  // Export handlers
+  const handleExportCSV = () => {
+    const csv = Papa.unparse(filteredTickets)
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    saveAs(blob, "support_tickets.csv")
+  }
+  const handleExportExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(filteredTickets)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Tickets")
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+    const blob = new Blob([wbout], { type: "application/octet-stream" })
+    saveAs(blob, "support_tickets.xlsx")
+  }
+  const handleExportPDF = async () => {
+    if (!filteredTickets.length) {
+      alert("No tickets to export.")
+      return
+    }
+    try {
+      const { jsPDF } = await import("jspdf")
+      const { default: autoTable } = await import("jspdf-autotable")
+      const doc = new jsPDF()
+      const columns = ["ID", "Customer", "Subject", "Status", "Priority", "Created", "Assigned To"]
+      const rows = filteredTickets.map((t) => [
+        String(t.id ?? ""),
+        String(t.customerName ?? t.customer_id ?? ""),
+        String(t.subject ?? ""),
+        String(t.status ?? ""),
+        String(t.priority ?? ""),
+        String(new Date(t.createdAt ?? t.created_at ?? Date.now()).toLocaleDateString()),
+        String(t.assignedTo ?? t.assigned_to ?? "Unassigned"),
+      ])
+      autoTable(doc, {
+        head: [columns],
+        body: rows,
+      })
+      const blob = doc.output("blob")
+      const filename = `support_tickets_export_pdf_${new Date().toISOString().split('T')[0]}.pdf`
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      // Optionally show a toast here
+    } catch (err) {
+      alert("PDF export failed: " + (err instanceof Error ? err.message : String(err)))
+    }
+  }
+
+  // Fetch messages for a ticket
+  const fetchMessages = async (ticketId: string) => {
+    setMessagesLoading(true)
+    try {
+      const res = await fetch(`/api/admin/support/messages?ticket_id=${ticketId}`)
+      const data = await res.json()
+      setMessages(data.messages || [])
+      console.log('Fetched messages:', data.messages)
+    } catch (e) {
+      setMessages([])
+      console.error('Error fetching messages:', e)
+    } finally {
+      setMessagesLoading(false)
+    }
+  }
+
+  // Post a new message
+  const postMessage = async (ticketId: string, message: string) => {
+    if (!message.trim()) return
+    try {
+      const res = await fetch(`/api/admin/support/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticket_id: ticketId, message }),
+      })
+      const data = await res.json()
+      console.log('Post message response:', data)
+      setNewMessage("")
+      await fetchMessages(ticketId)
+    } catch (e) {
+      console.error('Error posting message:', e)
+    }
+  }
+
+  // Fetch current admin user ID on mount
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentAdminId(data?.user?.id ?? null)
+    })
+  }, [])
+
+  // Ticket status/actions
+  const assignToMe = async (ticket: any) => {
+    if (!ticket || !ticket.id || !currentAdminId) return
+    setActionLoading(true)
+    try {
+      console.log('Assign to Me: currentAdminId:', currentAdminId, 'ticket.assignedTo:', ticket.assignedTo)
+      console.log('Assigning to me payload:', { id: ticket.id, assigned_to: currentAdminId })
+      const res = await fetch("/api/admin/support", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: ticket.id, assigned_to: currentAdminId }),
+      })
+      const data = await res.json()
+      console.log('Assign to Me response:', data)
+      if (res.ok) {
+        setViewTicket(null)
+        fetchTickets()
+      } else {
+        alert('Failed to assign ticket: ' + (data.error || 'Unknown error'))
+      }
+    } catch (e) {
+      alert('Failed to assign ticket: ' + e)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+  const updateTicketStatus = async (ticket: any, status: string, resolution?: string) => {
+    if (!ticket || !ticket.id) return
+    setActionLoading(true)
+    try {
+      console.log('Updating ticket status:', { ticketId: ticket.id, status, resolution })
+      const res = await fetch("/api/admin/support", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: ticket.id, status, resolution }),
+      })
+      const data = await res.json()
+      console.log('Update status response:', data)
+      if (res.ok) {
+        setViewTicket(null)
+        fetchTickets()
+      } else {
+        alert('Failed to update ticket: ' + (data.error || 'Unknown error'))
+      }
+    } catch (e) {
+      alert('Failed to update ticket: ' + e)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // Ensure message thread is always shown and fetches messages for the ticket
+  useEffect(() => {
+    if (viewTicket?.id) {
+      fetchMessages(viewTicket.id)
+    }
+  }, [viewTicket?.id])
+
+  // Add a stub for View Customer
+  const viewCustomer = (ticket: any) => {
+    alert(`View Customer: ${ticket.customerName ?? ticket.customerId}`)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Support Ticket Management</h1>
-        <Button>
-          <MessageSquare className="mr-2 h-4 w-4" /> Create Ticket
-        </Button>
+        <Link href="/admin/support/create">
+          <Button>
+            <MessageSquare className="mr-2 h-4 w-4" /> Create Ticket
+          </Button>
+        </Link>
       </div>
 
       {/* Summary Cards */}
@@ -293,15 +401,15 @@ export default function SupportPage() {
                   <DropdownMenuLabel>Filter by</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem>
-                    <Checkbox id="high" className="mr-2" />
+                    <Checkbox id="high" className="mr-2" checked={filters.high} onCheckedChange={(v: boolean) => handleFilterChange('high', v)} />
                     <Label htmlFor="high">High Priority</Label>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <Checkbox id="unassigned" className="mr-2" />
+                    <Checkbox id="unassigned" className="mr-2" checked={filters.unassigned} onCheckedChange={(v: boolean) => handleFilterChange('unassigned', v)} />
                     <Label htmlFor="unassigned">Unassigned</Label>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <Checkbox id="recent" className="mr-2" />
+                    <Checkbox id="recent" className="mr-2" checked={filters.recent} onCheckedChange={(v: boolean) => handleFilterChange('recent', v)} />
                     <Label htmlFor="recent">Last 24 Hours</Label>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -318,10 +426,19 @@ export default function SupportPage() {
                 </TabsList>
               </Tabs>
 
-              <Button variant="outline" size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Download className="mr-2 h-4 w-4" />
+                    Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleExportCSV}>Export as CSV</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportExcel}>Export as Excel</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportPDF}>Export as PDF</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
@@ -347,31 +464,29 @@ export default function SupportPage() {
               </TableHeader>
               <TableBody>
                 {filteredTickets.map((ticket) => (
-                  <TableRow key={ticket.id}>
+                  <TableRow key={ticket.id ?? ""}>
                     <TableCell>
                       <Checkbox
-                        checked={selectedTickets.includes(ticket.id)}
-                        onCheckedChange={() => toggleTicketSelection(ticket.id)}
+                        checked={selectedTickets.includes(ticket.id ?? "")}
+                        onCheckedChange={() => toggleTicketSelection(ticket.id ?? "")}
                       />
                     </TableCell>
-                    <TableCell className="font-medium">{ticket.id}</TableCell>
+                    <TableCell className="font-medium">{ticket.id ?? ""}</TableCell>
                     <TableCell>
                       <div className="flex flex-col">
-                        <span>{ticket.customerName}</span>
-                        <span className="text-xs text-muted-foreground">{ticket.customerId}</span>
+                        <span>{ticket.customerName ?? ""}</span>
+                        <span className="text-xs text-muted-foreground">{ticket.customerEmail ?? ticket.customerId ?? ""}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{ticket.subject}</TableCell>
+                    <TableCell>{ticket.subject ?? ""}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant={
-                          ticket.status === "open"
-                            ? "outline"
-                            : ticket.status === "in-progress"
-                              ? "secondary"
-                              : "default"
-                        }
-                      >
+                      <Badge variant={
+                        ticket.status === "open"
+                          ? "outline"
+                          : ticket.status === "in-progress"
+                            ? "secondary"
+                            : "default"
+                      }>
                         {ticket.status}
                       </Badge>
                     </TableCell>
@@ -388,14 +503,14 @@ export default function SupportPage() {
                         {ticket.priority}
                       </Badge>
                     </TableCell>
-                    <TableCell>{new Date(ticket.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(ticket.createdAt ?? ticket.created_at ?? "").toLocaleDateString()}</TableCell>
                     <TableCell>
-                      {ticket.assignedTo ? (
-                        ticket.assignedTo
+                      {ticket.assignedAdmin && (ticket.assignedAdmin.first_name || ticket.assignedAdmin.last_name || ticket.assignedAdmin.email) ? (
+                        `${ticket.assignedAdmin.first_name ?? ''} ${ticket.assignedAdmin.last_name ?? ''}`.trim() || ticket.assignedAdmin.email
+                      ) : ticket.assignedTo ? (
+                        ticket.assignedTo === currentAdminId ? 'Assigned to Me' : ticket.assignedTo
                       ) : (
-                        <Badge variant="outline" className="text-amber-500 border-amber-500">
-                          Unassigned
-                        </Badge>
+                        <Badge variant="outline">Unassigned</Badge>
                       )}
                     </TableCell>
                     <TableCell>
@@ -417,11 +532,11 @@ export default function SupportPage() {
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-4">
                                     <Avatar className="h-10 w-10">
-                                      <AvatarFallback>{viewTicket.customerName.charAt(0)}</AvatarFallback>
+                                      <AvatarFallback>{(viewTicket.customerName ?? "?").charAt(0)}</AvatarFallback>
                                     </Avatar>
                                     <div>
-                                      <h3 className="text-lg font-semibold">{viewTicket.customerName}</h3>
-                                      <p className="text-sm text-muted-foreground">{viewTicket.customerId}</p>
+                                      <h3 className="text-lg font-semibold">{viewTicket.customerName ?? ""}</h3>
+                                      <p className="text-sm text-muted-foreground">{viewTicket.customerId ?? ""}</p>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -451,34 +566,34 @@ export default function SupportPage() {
                                 </div>
 
                                 <div>
-                                  <h4 className="text-base font-medium">{viewTicket.subject}</h4>
+                                  <h4 className="text-base font-medium">{viewTicket.subject ?? ""}</h4>
                                   <div className="mt-2 rounded-md bg-muted p-3 text-sm">
-                                    <p>{viewTicket.description}</p>
+                                    <p>{viewTicket.description ?? ""}</p>
                                   </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                   <div>
                                     <Label className="text-sm text-muted-foreground">Created At</Label>
-                                    <p>{formatDate(viewTicket.createdAt)}</p>
+                                    <p>{formatDate(viewTicket.createdAt ?? "")}</p>
                                   </div>
                                   <div>
                                     <Label className="text-sm text-muted-foreground">Last Updated</Label>
-                                    <p>{formatDate(viewTicket.updatedAt)}</p>
+                                    <p>{formatDate(viewTicket.updatedAt ?? "")}</p>
                                   </div>
                                   <div>
                                     <Label className="text-sm text-muted-foreground">Category</Label>
-                                    <p className="capitalize">{viewTicket.category}</p>
+                                    <p className="capitalize">{viewTicket.category ?? ""}</p>
                                   </div>
                                   <div>
                                     <Label className="text-sm text-muted-foreground">Assigned To</Label>
                                     <p>
-                                      {viewTicket.assignedTo ? (
-                                        viewTicket.assignedTo
+                                      {viewTicket.assignedAdmin && (viewTicket.assignedAdmin.first_name || viewTicket.assignedAdmin.last_name || viewTicket.assignedAdmin.email) ? (
+                                        `${viewTicket.assignedAdmin.first_name ?? ''} ${viewTicket.assignedAdmin.last_name ?? ''}`.trim() || viewTicket.assignedAdmin.email
+                                      ) : viewTicket.assignedTo ? (
+                                        viewTicket.assignedTo === currentAdminId ? 'Assigned to Me' : viewTicket.assignedTo
                                       ) : (
-                                        <Badge variant="outline" className="text-amber-500 border-amber-500">
-                                          Unassigned
-                                        </Badge>
+                                        <Badge variant="outline">Unassigned</Badge>
                                       )}
                                     </p>
                                   </div>
@@ -488,32 +603,55 @@ export default function SupportPage() {
                                   <div>
                                     <Label className="text-sm text-muted-foreground">Resolution</Label>
                                     <div className="mt-1 rounded-md bg-muted p-3 text-sm">
-                                      <p>{viewTicket.resolution}</p>
+                                      <p>{viewTicket.resolution ?? ""}</p>
                                     </div>
                                   </div>
                                 )}
 
-                                {viewTicket.status !== "closed" && (
-                                  <div>
-                                    <Label htmlFor="response">Response</Label>
-                                    <Textarea id="response" placeholder="Type your response here..." className="mt-1" />
+                                {/* Message Thread */}
+                                <div>
+                                  <Label className="text-sm text-muted-foreground mb-2">Conversation</Label>
+                                  <div className="max-h-48 overflow-y-auto border rounded p-2 bg-muted mb-2">
+                                    {messagesLoading ? (
+                                      <div>Loading messages...</div>
+                                    ) : messages.length === 0 ? (
+                                      <div className="text-muted-foreground text-sm">No messages yet.</div>
+                                    ) : (
+                                      messages.map((msg) => (
+                                        <div key={msg.id} className="mb-2">
+                                          <span className="font-semibold text-xs mr-2">{msg.sender_type === 'admin' ? 'Admin' : 'Customer'}</span>
+                                          <span className="text-xs text-muted-foreground">{new Date(msg.created_at).toLocaleString()}</span>
+                                          <div className="ml-2 text-sm">{msg.message}</div>
+                                        </div>
+                                      ))
+                                    )}
                                   </div>
-                                )}
+                                  {viewTicket.status !== "closed" && (
+                                    <div className="flex gap-2 mt-2">
+                                      <Textarea
+                                        id="response"
+                                        placeholder="Type your response here..."
+                                        className="mt-1 flex-1"
+                                        value={newMessage}
+                                        onChange={e => setNewMessage(e.target.value)}
+                                      />
+                                      <Button onClick={() => postMessage(viewTicket.id, newMessage)} disabled={!newMessage.trim()}>Send</Button>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             )}
                             <DialogFooter>
                               {viewTicket?.status !== "closed" ? (
                                 <>
-                                  {!viewTicket?.assignedTo && <Button variant="outline">Assign to Me</Button>}
-                                  <Button variant="outline">
-                                    <Clock className="mr-2 h-4 w-4" /> Mark In Progress
-                                  </Button>
-                                  <Button>
-                                    <CheckCircle className="mr-2 h-4 w-4" /> Resolve & Close
-                                  </Button>
+                                  {(!viewTicket?.assignedTo || viewTicket.assignedTo !== currentAdminId) && (
+                                    <Button variant="outline" onClick={() => assignToMe(viewTicket)} disabled={actionLoading}>Assign to Me</Button>
+                                  )}
+                                  <Button variant="outline" onClick={() => updateTicketStatus(viewTicket, "in-progress") } disabled={actionLoading}> <Clock className="mr-2 h-4 w-4" /> Mark In Progress</Button>
+                                  <Button onClick={() => updateTicketStatus(viewTicket, "closed") } disabled={actionLoading}> <CheckCircle className="mr-2 h-4 w-4" /> Resolve & Close</Button>
                                 </>
                               ) : (
-                                <Button variant="outline">Reopen Ticket</Button>
+                                <Button variant="outline" onClick={() => updateTicketStatus(viewTicket, "open") } disabled={actionLoading}>Reopen Ticket</Button>
                               )}
                             </DialogFooter>
                           </DialogContent>
@@ -526,26 +664,26 @@ export default function SupportPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => viewCustomer(ticket)}>
                               <User className="mr-2 h-4 w-4" /> View Customer
                             </DropdownMenuItem>
                             {ticket.status !== "closed" && (
                               <>
-                                {!ticket.assignedTo && (
-                                  <DropdownMenuItem>
+                                {(!ticket.assignedTo || ticket.assignedTo !== currentAdminId) && (
+                                  <DropdownMenuItem onClick={() => assignToMe(ticket)} disabled={actionLoading}>
                                     <User className="mr-2 h-4 w-4" /> Assign to Me
                                   </DropdownMenuItem>
                                 )}
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => updateTicketStatus(ticket, "in-progress") } disabled={actionLoading}>
                                   <Clock className="mr-2 h-4 w-4" /> Mark In Progress
                                 </DropdownMenuItem>
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => updateTicketStatus(ticket, "closed") } disabled={actionLoading}>
                                   <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Resolve & Close
                                 </DropdownMenuItem>
                               </>
                             )}
                             {ticket.status === "closed" && (
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => updateTicketStatus(ticket, "open") } disabled={actionLoading}>
                                 <AlertTriangle className="mr-2 h-4 w-4" /> Reopen Ticket
                               </DropdownMenuItem>
                             )}
@@ -563,3 +701,4 @@ export default function SupportPage() {
     </div>
   )
 }
+

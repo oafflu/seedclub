@@ -11,15 +11,35 @@
       "static/chunks/main-app.js",
       "static/chunks/app/admin/layout.js"
     ],
-    "/admin/page": [
+    "/admin/support/loading": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/page.js"
+      "static/chunks/app/admin/support/loading.js"
     ],
-    "/admin/dashboard/page": [
+    "/admin/support/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/dashboard/page.js"
+      "static/chunks/app/admin/support/page.js"
+    ],
+    "/api/admin/support/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/support/route.js"
+    ],
+    "/admin/customers/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/customers/loading.js"
+    ],
+    "/admin/customers/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/customers/page.js"
+    ],
+    "/api/admin/customers/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/customers/route.js"
     ],
     "/admin/jars/loading": [
       "static/chunks/webpack.js",
@@ -36,50 +56,75 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/admin/jars/route.js"
     ],
-    "/admin/settings/loading": [
+    "/api/admin/support/messages/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/settings/loading.js"
+      "static/chunks/app/api/admin/support/messages/route.js"
     ],
-    "/admin/settings/page": [
+    "/admin/login/loading": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/settings/page.js"
+      "static/chunks/app/admin/login/loading.js"
     ],
-    "/api/admin/settings/general/route": [
+    "/admin/login/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/settings/general/route.js"
+      "static/chunks/app/admin/login/page.js"
     ],
-    "/api/admin/settings/notifications/route": [
+    "/mobile/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/settings/notifications/route.js"
+      "static/chunks/app/mobile/layout.js"
     ],
-    "/api/admin/settings/security/route": [
+    "/mobile/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/settings/security/route.js"
+      "static/chunks/app/mobile/page.js"
     ],
-    "/api/admin/settings/investment/route": [
+    "/auth/login/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/settings/investment/route.js"
+      "static/chunks/app/auth/login/page.js"
     ],
-    "/api/admin/settings/integrations/route": [
+    "/mobile/dashboard/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/settings/integrations/route.js"
+      "static/chunks/app/mobile/dashboard/page.js"
     ],
-    "/admin/notifications/loading": [
+    "/mobile/profile/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/notifications/loading.js"
+      "static/chunks/app/mobile/profile/page.js"
     ],
-    "/admin/notifications/page": [
+    "/mobile/profile/payment-methods/loading": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/notifications/page.js"
+      "static/chunks/app/mobile/profile/payment-methods/loading.js"
+    ],
+    "/mobile/profile/payment-methods/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/mobile/profile/payment-methods/page.js"
+    ],
+    "/mobile/support/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/mobile/support/loading.js"
+    ],
+    "/mobile/support/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/mobile/support/page.js"
+    ],
+    "/api/support/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/support/route.js"
+    ],
+    "/_not-found/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/_not-found/page.js"
     ]
   }
 }

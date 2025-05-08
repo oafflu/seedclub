@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase/client'
-import { createClient } from '@/lib/supabase/client'
 import type { AdminUser, AdminRole, AdminPermission, AdminRolePermission, AdminUserRole, AuditLog } from '@/types/database'
 import type { AdminRole as AdminRoleType } from '@/types/admin'
 import { v4 as uuidv4 } from 'uuid'
@@ -148,21 +147,14 @@ export const adminService = {
   async getRolePermissions(roleId: string): Promise<AdminPermission[]> {
     const { data, error } = await supabase
       .from('admin_role_permissions')
-      .select(`
-        permission:admin_permissions(
-          id,
-          name,
-          description,
-          resource,
-          action,
-          created_at,
-          updated_at
-        )
-      `)
+      .select('permission:admin_permissions(*)')
       .eq('role_id', roleId)
     
     if (error) throw error
-    return (data as RolePermissionResponse[]).map(d => d.permission)
+    // Some Supabase versions return permission as an array, so flatten if needed
+    return ((data as unknown) as RolePermissionResponse[])
+      .map(d => Array.isArray(d.permission) ? d.permission[0] : d.permission)
+      .filter(Boolean)
   },
 
   async updateRolePermissions(roleId: string, permissionIds: string[]): Promise<void> {
@@ -187,8 +179,6 @@ export const adminService = {
 
   // Role Management
   async cloneRole(roleId: string, name: string, description: string): Promise<AdminRole> {
-    const supabase = createClient()
-    
     // Get the role's permissions
     const { data: permissions, error: permissionsError } = await supabase
       .from('admin_role_permissions')

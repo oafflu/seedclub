@@ -1,11 +1,10 @@
 {
-  "/api/admin/settings/general/route": "app/api/admin/settings/general/route.js",
-  "/api/admin/settings/investment/route": "app/api/admin/settings/investment/route.js",
-  "/api/admin/settings/integrations/route": "app/api/admin/settings/integrations/route.js",
-  "/api/admin/settings/notifications/route": "app/api/admin/settings/notifications/route.js",
-  "/api/admin/settings/security/route": "app/api/admin/settings/security/route.js",
-  "/admin/dashboard/page": "app/admin/dashboard/page.js",
-  "/admin/jars/page": "app/admin/jars/page.js",
-  "/admin/settings/page": "app/admin/settings/page.js",
-  "/admin/notifications/page": "app/admin/notifications/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/support/route": "app/api/support/route.js",
+  "/auth/login/page": "app/auth/login/page.js",
+  "/mobile/dashboard/page": "app/mobile/dashboard/page.js",
+  "/mobile/support/page": "app/mobile/support/page.js",
+  "/mobile/page": "app/mobile/page.js",
+  "/mobile/profile/page": "app/mobile/profile/page.js",
+  "/mobile/profile/payment-methods/page": "app/mobile/profile/payment-methods/page.js"
 }
