@@ -2,74 +2,31 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
-export function RecentSales() {
+const defaultSales = [
+  { name: "John Doe", action: "Created 12-month jar", amount: 1999, type: "deposit", avatar: "/avatars/01.png" },
+  { name: "Jane Smith", action: "Deposited to 6-month jar", amount: 39, type: "deposit", avatar: "/avatars/02.png" },
+  { name: "Robert Wilson", action: "Withdrew from 3-month jar", amount: 299, type: "withdrawal", avatar: "/avatars/03.png" },
+  { name: "Emma Brown", action: "Created 9-month jar", amount: 999, type: "deposit", avatar: "/avatars/04.png" },
+  { name: "Michael Davis", action: "Deposited to 12-month jar", amount: 499, type: "deposit", avatar: "/avatars/05.png" },
+]
+
+export function RecentSales({ sales }: { sales?: any[] }) {
+  const items = sales && sales.length > 0 ? sales : defaultSales
   return (
     <div className="space-y-8">
-      <div className="flex items-center">
-        <Avatar className="h-9 w-9">
-          <AvatarImage src="/avatars/01.png" alt="Avatar" />
-          <AvatarFallback>JD</AvatarFallback>
-        </Avatar>
-        <div className="ml-4 space-y-1">
-          <p className="text-sm font-medium leading-none">John Doe</p>
-          <p className="text-sm text-muted-foreground">
-            Created 12-month jar
-          </p>
+      {items.map((item, i) => (
+        <div className="flex items-center" key={i}>
+          <Avatar className="h-9 w-9">
+            <AvatarImage src={item.avatar || "/avatars/01.png"} alt="Avatar" />
+            <AvatarFallback>{item.name?.split(" ").map((n: string) => n[0]).join("")}</AvatarFallback>
+          </Avatar>
+          <div className="ml-4 space-y-1">
+            <p className="text-sm font-medium leading-none">{item.name}</p>
+            <p className="text-sm text-muted-foreground">{item.action}</p>
+          </div>
+          <div className={"ml-auto font-medium " + (item.type === "withdrawal" ? "text-red-500" : "")}>{item.type === "withdrawal" ? "-" : "+"}${item.amount.toLocaleString()}</div>
         </div>
-        <div className="ml-auto font-medium">+$1,999.00</div>
-      </div>
-      <div className="flex items-center">
-        <Avatar className="h-9 w-9">
-          <AvatarImage src="/avatars/02.png" alt="Avatar" />
-          <AvatarFallback>JS</AvatarFallback>
-        </Avatar>
-        <div className="ml-4 space-y-1">
-          <p className="text-sm font-medium leading-none">Jane Smith</p>
-          <p className="text-sm text-muted-foreground">
-            Deposited to 6-month jar
-          </p>
-        </div>
-        <div className="ml-auto font-medium">+$39.00</div>
-      </div>
-      <div className="flex items-center">
-        <Avatar className="h-9 w-9">
-          <AvatarImage src="/avatars/03.png" alt="Avatar" />
-          <AvatarFallback>RW</AvatarFallback>
-        </Avatar>
-        <div className="ml-4 space-y-1">
-          <p className="text-sm font-medium leading-none">Robert Wilson</p>
-          <p className="text-sm text-muted-foreground">
-            Withdrew from 3-month jar
-          </p>
-        </div>
-        <div className="ml-auto font-medium text-red-500">-$299.00</div>
-      </div>
-      <div className="flex items-center">
-        <Avatar className="h-9 w-9">
-          <AvatarImage src="/avatars/04.png" alt="Avatar" />
-          <AvatarFallback>EB</AvatarFallback>
-        </Avatar>
-        <div className="ml-4 space-y-1">
-          <p className="text-sm font-medium leading-none">Emma Brown</p>
-          <p className="text-sm text-muted-foreground">
-            Created 9-month jar
-          </p>
-        </div>
-        <div className="ml-auto font-medium">+$999.00</div>
-      </div>
-      <div className="flex items-center">
-        <Avatar className="h-9 w-9">
-          <AvatarImage src="/avatars/05.png" alt="Avatar" />
-          <AvatarFallback>MD</AvatarFallback>
-        </Avatar>
-        <div className="ml-4 space-y-1">
-          <p className="text-sm font-medium leading-none">Michael Davis</p>
-          <p className="text-sm text-muted-foreground">
-            Deposited to 12-month jar
-          </p>
-        </div>
-        <div className="ml-auto font-medium">+$499.00</div>
-      </div>
+      ))}
     </div>
   )
 } 

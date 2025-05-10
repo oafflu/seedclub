@@ -15,11 +15,18 @@ import {
 
 export function CalendarDateRangePicker({
   className,
-}: React.HTMLAttributes<HTMLDivElement>) {
+  value,
+  onChange,
+}: React.HTMLAttributes<HTMLDivElement> & {
+  value?: DateRange
+  onChange?: (range: DateRange | undefined) => void
+}) {
   const [date, setDate] = React.useState<DateRange | undefined>({
     from: new Date(2024, 0, 20),
     to: addDays(new Date(2024, 0, 20), 20),
   })
+  const controlledDate = value !== undefined ? value : date
+  const setControlledDate = onChange !== undefined ? onChange : setDate
 
   return (
     <div className={cn("grid gap-2", className)}>
@@ -30,18 +37,18 @@ export function CalendarDateRangePicker({
             variant={"outline"}
             className={cn(
               "w-[260px] justify-start text-left font-normal",
-              !date && "text-muted-foreground"
+              !controlledDate && "text-muted-foreground"
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
-            {date?.from ? (
-              date.to ? (
+            {controlledDate?.from ? (
+              controlledDate.to ? (
                 <>
-                  {format(date.from, "LLL dd, y")} -{" "}
-                  {format(date.to, "LLL dd, y")}
+                  {format(controlledDate.from, "LLL dd, y")} -{" "}
+                  {format(controlledDate.to, "LLL dd, y")}
                 </>
               ) : (
-                format(date.from, "LLL dd, y")
+                format(controlledDate.from, "LLL dd, y")
               )
             ) : (
               <span>Pick a date</span>
@@ -52,9 +59,9 @@ export function CalendarDateRangePicker({
           <Calendar
             initialFocus
             mode="range"
-            defaultMonth={date?.from}
-            selected={date}
-            onSelect={setDate}
+            defaultMonth={controlledDate?.from}
+            selected={controlledDate}
+            onSelect={setControlledDate}
             numberOfMonths={2}
           />
         </PopoverContent>

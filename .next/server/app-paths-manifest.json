@@ -1,16 +1,13 @@
 {
-  "/api/admin/jars/route": "app/api/admin/jars/route.js",
-  "/api/admin/settings/investment/route": "app/api/admin/settings/investment/route.js",
-  "/api/support/route": "app/api/support/route.js",
-  "/admin/audit-logs/page": "app/admin/audit-logs/page.js",
+  "/api/admin/system-monitoring/route": "app/api/admin/system-monitoring/route.js",
+  "/api/admin/audit-logs/route": "app/api/admin/audit-logs/route.js",
+  "/api/admin/transactions/route": "app/api/admin/transactions/route.js",
+  "/api/admin/transactions/pending/route": "app/api/admin/transactions/pending/route.js",
   "/mobile/dashboard/page": "app/mobile/dashboard/page.js",
-  "/mobile/referrals/page": "app/mobile/referrals/page.js",
-  "/mobile/invest/page": "app/mobile/invest/page.js",
-  "/mobile/profile/page": "app/mobile/profile/page.js",
-  "/mobile/profile/personal-info/page": "app/mobile/profile/personal-info/page.js",
-  "/mobile/profile/contact-info/page": "app/mobile/profile/contact-info/page.js",
-  "/mobile/profile/security/page": "app/mobile/profile/security/page.js",
-  "/mobile/profile/payment-methods/page": "app/mobile/profile/payment-methods/page.js",
-  "/mobile/support/page": "app/mobile/support/page.js",
-  "/mobile/page": "app/mobile/page.js"
+  "/admin/jars/page": "app/admin/jars/page.js",
+  "/admin/jars/edit/[id]/page": "app/admin/jars/edit/[id]/page.js",
+  "/admin/system-monitoring/page": "app/admin/system-monitoring/page.js",
+  "/admin/audit-logs/page": "app/admin/audit-logs/page.js",
+  "/admin/transactions/page": "app/admin/transactions/page.js",
+  "/admin/transactions/pending/page": "app/admin/transactions/pending/page.js"
 }

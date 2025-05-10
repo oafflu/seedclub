@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Search,
   Filter,
@@ -40,157 +40,127 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-
-// Mock data for audit logs
-const auditLogs = [
-  {
-    id: "LOG-001",
-    userId: "USER-001",
-    userName: "John Admin",
-    action: "login",
-    resource: "system",
-    resourceId: null,
-    details: "User logged in successfully",
-    ipAddress: "192.168.1.1",
-    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    timestamp: "2024-01-20T14:30:00Z",
-    category: "authentication",
-  },
-  {
-    id: "LOG-002",
-    userId: "USER-001",
-    userName: "John Admin",
-    action: "update",
-    resource: "settings",
-    resourceId: "SETTING-001",
-    details: "Updated system settings: Changed APY rate for 12-month jar from 10% to 12%",
-    ipAddress: "192.168.1.1",
-    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    timestamp: "2024-01-20T14:35:00Z",
-    category: "settings",
-  },
-  {
-    id: "LOG-003",
-    userId: "USER-002",
-    userName: "Sarah Manager",
-    action: "create",
-    resource: "customer",
-    resourceId: "CUST-010",
-    details: "Created new customer account for Jane Doe",
-    ipAddress: "192.168.1.2",
-    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-    timestamp: "2024-01-20T15:10:00Z",
-    category: "customer",
-  },
-  {
-    id: "LOG-004",
-    userId: "USER-003",
-    userName: "Michael Support",
-    action: "view",
-    resource: "transaction",
-    resourceId: "TX-105",
-    details: "Viewed transaction details for TX-105",
-    ipAddress: "192.168.1.3",
-    userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15",
-    timestamp: "2024-01-20T15:45:00Z",
-    category: "transaction",
-  },
-  {
-    id: "LOG-005",
-    userId: "USER-002",
-    userName: "Sarah Manager",
-    action: "approve",
-    resource: "withdrawal",
-    resourceId: "TX-102",
-    details: "Approved withdrawal request for $2,000 from Emily Davis (CUST-004)",
-    ipAddress: "192.168.1.2",
-    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-    timestamp: "2024-01-20T16:20:00Z",
-    category: "transaction",
-  },
-  {
-    id: "LOG-006",
-    userId: "USER-001",
-    userName: "John Admin",
-    action: "create",
-    resource: "user",
-    resourceId: "USER-005",
-    details: "Created new admin user: Robert Viewer with Viewer role",
-    ipAddress: "192.168.1.1",
-    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    timestamp: "2024-01-20T16:45:00Z",
-    category: "user",
-  },
-  {
-    id: "LOG-007",
-    userId: "USER-004",
-    userName: "Emily Analyst",
-    action: "export",
-    resource: "report",
-    resourceId: null,
-    details: "Exported monthly transaction report for January 2024",
-    ipAddress: "192.168.1.4",
-    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    timestamp: "2024-01-20T17:15:00Z",
-    category: "report",
-  },
-  {
-    id: "LOG-008",
-    userId: "USER-003",
-    userName: "Michael Support",
-    action: "update",
-    resource: "ticket",
-    resourceId: "TICKET-003",
-    details: "Updated support ticket: Marked as in-progress and assigned to self",
-    ipAddress: "192.168.1.3",
-    userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15",
-    timestamp: "2024-01-20T17:30:00Z",
-    category: "support",
-  },
-  {
-    id: "LOG-009",
-    userId: "USER-001",
-    userName: "John Admin",
-    action: "update",
-    resource: "role",
-    resourceId: "ROLE-003",
-    details: "Updated Support role permissions: Added view reports permission",
-    ipAddress: "192.168.1.1",
-    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    timestamp: "2024-01-20T18:00:00Z",
-    category: "user",
-  },
-  {
-    id: "LOG-010",
-    userId: "SYSTEM",
-    userName: "System",
-    action: "process",
-    resource: "interest",
-    resourceId: null,
-    details: "Processed monthly interest payments for all active jars",
-    ipAddress: "127.0.0.1",
-    userAgent: "SeedClub/1.0",
-    timestamp: "2024-01-20T00:00:00Z",
-    category: "system",
-  },
-]
+import { format } from 'date-fns'
+import { CalendarDateRangePicker } from '@/components/date-range-picker'
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from '@/components/ui/select'
 
 export default function AuditLogsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [viewLog, setViewLog] = useState<any>(null)
   const [activeTab, setActiveTab] = useState("all")
+  const [logs, setLogs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [total, setTotal] = useState(0)
+  const [actionFilter, setActionFilter] = useState("")
+  const [userFilter, setUserFilter] = useState("")
+  const [resourceFilter, setResourceFilter] = useState("")
+  const [dateRange, setDateRange] = useState<{start: string|null, end: string|null}>({start: null, end: null})
+  const [actionOptions, setActionOptions] = useState<string[]>([])
+  const [userOptions, setUserOptions] = useState<string[]>([])
+  const [resourceOptions, setResourceOptions] = useState<string[]>([])
 
-  const filteredLogs = auditLogs
+  // Fetch logs with filters and pagination
+  useEffect(() => {
+    async function fetchLogs() {
+      setLoading(true)
+      const params = new URLSearchParams()
+      params.set('page', String(page))
+      params.set('pageSize', String(pageSize))
+      if (searchTerm) params.set('search', searchTerm)
+      if (actionFilter) params.set('action', actionFilter)
+      if (userFilter) params.set('user', userFilter)
+      if (resourceFilter) params.set('resource', resourceFilter)
+      if (dateRange.start) params.set('start', dateRange.start)
+      if (dateRange.end) params.set('end', dateRange.end)
+      const res = await fetch(`/api/admin/audit-logs?${params.toString()}`)
+      const data = await res.json()
+      setLogs(data.logs || [])
+      setTotal(data.total || 0)
+      setLoading(false)
+    }
+    fetchLogs()
+    // eslint-disable-next-line
+  }, [page, pageSize, searchTerm, actionFilter, userFilter, resourceFilter, dateRange])
+
+  // Fetch filter options
+  useEffect(() => {
+    fetch('/api/admin/audit-logs?distinct=action').then(r => r.json()).then(d => setActionOptions(d.values || []))
+    fetch('/api/admin/audit-logs?distinct=user_name').then(r => r.json()).then(d => setUserOptions(d.values || []))
+    fetch('/api/admin/audit-logs?distinct=resource').then(r => r.json()).then(d => setResourceOptions(d.values || []))
+  }, [])
+
+  // Export handlers
+  const handleExport = async (formatType: 'csv' | 'excel' | 'pdf') => {
+    // Use all logs for export (fetch all pages)
+    const params = new URLSearchParams()
+    params.set('page', '1')
+    params.set('pageSize', String(total || 1000))
+    if (searchTerm) params.set('search', searchTerm)
+    if (actionFilter) params.set('action', actionFilter)
+    if (userFilter) params.set('user', userFilter)
+    if (resourceFilter) params.set('resource', resourceFilter)
+    if (dateRange.start) params.set('start', dateRange.start)
+    if (dateRange.end) params.set('end', dateRange.end)
+    const res = await fetch(`/api/admin/audit-logs?${params.toString()}`)
+    const data = await res.json()
+    const exportLogs = data.logs || []
+    if (!exportLogs.length) return
+    if (formatType === 'csv') {
+      const csvRows = [
+        Object.keys(exportLogs[0]).join(','),
+        ...exportLogs.map((row: any) => Object.values(row).map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+      ]
+      const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = `audit_logs_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } else if (formatType === 'excel') {
+      const XLSX = await import('xlsx')
+      const ws = XLSX.utils.json_to_sheet(exportLogs)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Audit Logs')
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = `audit_logs_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } else if (formatType === 'pdf') {
+      const { jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+      const doc = new jsPDF()
+      autoTable(doc, {
+        head: [Object.keys(exportLogs[0])],
+        body: exportLogs.map((row: any) => Object.values(row)),
+      })
+      doc.save(`audit_logs_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`)
+    }
+  }
+
+  const filteredLogs = logs
     .filter(
       (log) =>
-        log.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.details.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.id.toLowerCase().includes(searchTerm.toLowerCase()),
+        (log.userName || log.user_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (log.action || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (log.details || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (log.id || "").toLowerCase().includes(searchTerm.toLowerCase())
     )
     .filter((log) => {
       if (activeTab === "all") return true
-      return log.category === activeTab
+      return (log.category || log.resource || "") === activeTab
     })
 
   // Format date
@@ -228,14 +198,36 @@ export default function AuditLogsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Audit Logs</h1>
         <div className="flex items-center gap-2">
-          <Button variant="outline">
-            <Calendar className="mr-2 h-4 w-4" />
-            Date Range
-          </Button>
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Export Logs
-          </Button>
+          {/* Date Range Picker */}
+          <CalendarDateRangePicker
+            className="mr-2"
+            onChange={(range: any) => {
+              setDateRange({
+                start: range?.from ? format(range.from, 'yyyy-MM-dd') : null,
+                end: range?.to ? format(range.to, 'yyyy-MM-dd') : null,
+              })
+              setPage(1)
+            }}
+            value={{
+              from: dateRange.start ? new Date(dateRange.start) : undefined,
+              to: dateRange.end ? new Date(dateRange.end) : undefined,
+            }}
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="mr-2 h-4 w-4" />
+                Export Logs
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Export Format</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleExport('csv')}>Export as CSV</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('excel')}>Export as Excel</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('pdf')}>Export as PDF</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -254,38 +246,47 @@ export default function AuditLogsPage() {
                   placeholder="Search logs..."
                   className="pl-8"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setPage(1) }}
                 />
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Filter className="mr-2 h-4 w-4" />
-                    Filter
-                    <ChevronDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[200px]">
-                  <DropdownMenuLabel>Filter by</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <Checkbox id="admin-actions" className="mr-2" />
-                    <Label htmlFor="admin-actions">Admin Actions</Label>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Checkbox id="system-events" className="mr-2" />
-                    <Label htmlFor="system-events">System Events</Label>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Checkbox id="today-only" className="mr-2" />
-                    <Label htmlFor="today-only">Today Only</Label>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Action Filter */}
+              <Select value={actionFilter || '__all__'} onValueChange={v => { setActionFilter(v === '__all__' ? '' : v); setPage(1) }}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Action" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Actions</SelectItem>
+                  {actionOptions.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {/* User Filter */}
+              <Select value={userFilter || '__all__'} onValueChange={v => { setUserFilter(v === '__all__' ? '' : v); setPage(1) }}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="User" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Users</SelectItem>
+                  {userOptions.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {/* Resource Filter */}
+              <Select value={resourceFilter || '__all__'} onValueChange={v => { setResourceFilter(v === '__all__' ? '' : v); setPage(1) }}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Resource" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Resources</SelectItem>
+                  {resourceOptions.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {/* Reset Filters */}
+              <Button variant="outline" size="sm" onClick={() => {
+                setActionFilter(""); setUserFilter(""); setResourceFilter(""); setDateRange({start: null, end: null}); setSearchTerm(""); setPage(1)
+              }}>Reset</Button>
             </div>
 
             <div className="flex items-center space-x-2">
-              <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
+              <Tabs defaultValue="all" value={activeTab} onValueChange={v => { setActiveTab(v); setPage(1) }}>
                 <TabsList>
                   <TabsTrigger value="all">All</TabsTrigger>
                   <TabsTrigger value="authentication">Auth</TabsTrigger>
@@ -298,6 +299,9 @@ export default function AuditLogsPage() {
           </div>
 
           <div className="mt-6 rounded-md border">
+            {loading ? (
+              <div className="flex justify-center items-center h-32 text-muted-foreground">Loading logs...</div>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -317,22 +321,22 @@ export default function AuditLogsPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Avatar className="h-6 w-6">
-                          <AvatarFallback className="text-xs">{log.userName.charAt(0)}</AvatarFallback>
+                          <AvatarFallback className="text-xs">{(log.userName || log.user_name || "?").charAt(0)}</AvatarFallback>
                         </Avatar>
-                        <span>{log.userName}</span>
+                        <span>{log.userName || log.user_name || "System"}</span>
                       </div>
                     </TableCell>
                     <TableCell className="capitalize">{log.action}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="capitalize">
                         <div className="flex items-center gap-1">
-                          {getCategoryIcon(log.category)}
+                          {getCategoryIcon(log.category || log.resource)}
                           <span>{log.resource}</span>
                         </div>
                       </Badge>
                     </TableCell>
                     <TableCell className="max-w-xs truncate">{log.details}</TableCell>
-                    <TableCell>{formatDate(log.timestamp)}</TableCell>
+                    <TableCell>{formatDate(log.performed_at || log.timestamp)}</TableCell>
                     <TableCell>
                       <div className="flex justify-end">
                         <Dialog>
@@ -351,7 +355,7 @@ export default function AuditLogsPage() {
                               <div className="grid gap-4 py-4">
                                 <div className="flex items-center gap-4">
                                   <div className="rounded-full bg-primary/10 p-3">
-                                    {getCategoryIcon(viewLog.category)}
+                                    {getCategoryIcon(viewLog.category || viewLog.resource)}
                                   </div>
                                   <div>
                                     <h3 className="text-lg font-semibold capitalize">
@@ -364,24 +368,24 @@ export default function AuditLogsPage() {
                                   <div>
                                     <Label className="text-sm text-muted-foreground">User</Label>
                                     <p>
-                                      {viewLog.userName} ({viewLog.userId})
+                                      {(viewLog.userName || viewLog.user_name || "System")} ({viewLog.userId || viewLog.user_id || "N/A"})
                                     </p>
                                   </div>
                                   <div>
                                     <Label className="text-sm text-muted-foreground">Timestamp</Label>
-                                    <p>{formatDate(viewLog.timestamp)}</p>
+                                    <p>{formatDate(viewLog.performed_at || viewLog.timestamp)}</p>
                                   </div>
                                   <div>
                                     <Label className="text-sm text-muted-foreground">IP Address</Label>
-                                    <p>{viewLog.ipAddress}</p>
+                                    <p>{viewLog.ipAddress || viewLog.ip_address}</p>
                                   </div>
                                   <div>
                                     <Label className="text-sm text-muted-foreground">Resource ID</Label>
-                                    <p>{viewLog.resourceId || "N/A"}</p>
+                                    <p>{viewLog.resourceId || viewLog.entity_id || "N/A"}</p>
                                   </div>
                                   <div className="col-span-2">
                                     <Label className="text-sm text-muted-foreground">User Agent</Label>
-                                    <p className="text-sm">{viewLog.userAgent}</p>
+                                    <p className="text-sm">{viewLog.userAgent || viewLog.user_agent}</p>
                                   </div>
                                   <div className="col-span-2">
                                     <Label className="text-sm text-muted-foreground">Details</Label>
@@ -398,6 +402,33 @@ export default function AuditLogsPage() {
                 ))}
               </TableBody>
             </Table>
+            )}
+          </div>
+
+          {/* Add pagination controls below the table */}
+          <div className="flex justify-between items-center mt-4">
+            <div className="text-sm text-muted-foreground">
+              Showing {Math.min((page - 1) * pageSize + 1, total)}-
+              {Math.min(page * pageSize, total)} of {total} logs
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>
+                Previous
+              </Button>
+              <span className="text-sm">Page {page}</span>
+              <Button variant="outline" size="sm" disabled={page * pageSize >= total} onClick={() => setPage(page + 1)}>
+                Next
+              </Button>
+              <select
+                className="ml-2 border rounded px-2 py-1 text-sm"
+                value={pageSize}
+                onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}
+              >
+                {[10, 20, 50, 100].map(size => (
+                  <option key={size} value={size}>{size} / page</option>
+                ))}
+              </select>
+            </div>
           </div>
         </CardContent>
       </Card>

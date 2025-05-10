@@ -1,4 +1,58 @@
 {
+  "app/admin/audit-logs/page.tsx -> jspdf": {
+    "id": "app/admin/audit-logs/page.tsx -> jspdf",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_jspdf_dist_jspdf_es_min_js.js"
+    ]
+  },
+  "app/admin/audit-logs/page.tsx -> jspdf-autotable": {
+    "id": "app/admin/audit-logs/page.tsx -> jspdf-autotable",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_jspdf-autotable_dist_jspdf_plugin_autotable_mjs.js"
+    ]
+  },
+  "app/admin/audit-logs/page.tsx -> xlsx": {
+    "id": "app/admin/audit-logs/page.tsx -> xlsx",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_xlsx_xlsx_mjs.js"
+    ]
+  },
+  "app/admin/jars/page.tsx -> jspdf": {
+    "id": "app/admin/jars/page.tsx -> jspdf",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_jspdf_dist_jspdf_es_min_js.js"
+    ]
+  },
+  "app/admin/jars/page.tsx -> jspdf-autotable": {
+    "id": "app/admin/jars/page.tsx -> jspdf-autotable",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_jspdf-autotable_dist_jspdf_plugin_autotable_mjs.js"
+    ]
+  },
+  "app/admin/jars/page.tsx -> xlsx": {
+    "id": "app/admin/jars/page.tsx -> xlsx",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_xlsx_xlsx_mjs.js"
+    ]
+  },
+  "app/admin/reports/page.tsx -> jspdf": {
+    "id": "app/admin/reports/page.tsx -> jspdf",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_jspdf_dist_jspdf_es_min_js.js"
+    ]
+  },
+  "app/admin/reports/page.tsx -> jspdf-autotable": {
+    "id": "app/admin/reports/page.tsx -> jspdf-autotable",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_jspdf-autotable_dist_jspdf_plugin_autotable_mjs.js"
+    ]
+  },
+  "app/admin/reports/page.tsx -> xlsx": {
+    "id": "app/admin/reports/page.tsx -> xlsx",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_xlsx_xlsx_mjs.js"
+    ]
+  },
   "app/admin/support/page.tsx -> jspdf": {
     "id": "app/admin/support/page.tsx -> jspdf",
     "files": [
@@ -9,6 +63,42 @@
     "id": "app/admin/support/page.tsx -> jspdf-autotable",
     "files": [
       "static/chunks/_app-pages-browser_node_modules_jspdf-autotable_dist_jspdf_plugin_autotable_mjs.js"
+    ]
+  },
+  "app/admin/transactions/page.tsx -> jspdf": {
+    "id": "app/admin/transactions/page.tsx -> jspdf",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_jspdf_dist_jspdf_es_min_js.js"
+    ]
+  },
+  "app/admin/transactions/page.tsx -> jspdf-autotable": {
+    "id": "app/admin/transactions/page.tsx -> jspdf-autotable",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_jspdf-autotable_dist_jspdf_plugin_autotable_mjs.js"
+    ]
+  },
+  "app/admin/transactions/page.tsx -> xlsx": {
+    "id": "app/admin/transactions/page.tsx -> xlsx",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_xlsx_xlsx_mjs.js"
+    ]
+  },
+  "app/admin/transactions/pending/page.tsx -> jspdf": {
+    "id": "app/admin/transactions/pending/page.tsx -> jspdf",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_jspdf_dist_jspdf_es_min_js.js"
+    ]
+  },
+  "app/admin/transactions/pending/page.tsx -> jspdf-autotable": {
+    "id": "app/admin/transactions/pending/page.tsx -> jspdf-autotable",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_jspdf-autotable_dist_jspdf_plugin_autotable_mjs.js"
+    ]
+  },
+  "app/admin/transactions/pending/page.tsx -> xlsx": {
+    "id": "app/admin/transactions/pending/page.tsx -> xlsx",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_xlsx_xlsx_mjs.js"
     ]
   },
   "node_modules/@supabase/auth-js/dist/module/lib/helpers.js -> @supabase/node-fetch": {

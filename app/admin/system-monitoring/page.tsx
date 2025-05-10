@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Calendar,
   RefreshCw,
@@ -283,13 +283,33 @@ const recentAlerts = [
 export default function SystemMonitoringPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [timeRange, setTimeRange] = useState("24h")
+  const [metrics, setMetrics] = useState<any>(null)
+  const [services, setServices] = useState<any[]>([])
+  const [alerts, setAlerts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchMonitoringData = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch("/api/admin/system-monitoring")
+      const data = await res.json()
+      setMetrics(data.metrics)
+      setServices(data.services)
+      setAlerts(data.alerts)
+    } catch (e) {
+      // Optionally handle error
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    fetchMonitoringData()
+    // eslint-disable-next-line
+  }, [])
 
   const handleRefresh = () => {
     setRefreshing(true)
-    // Simulate API call
-    setTimeout(() => {
-      setRefreshing(false)
-    }, 1000)
+    fetchMonitoringData().then(() => setRefreshing(false))
   }
 
   // Get status icon
@@ -356,58 +376,60 @@ export default function SystemMonitoringPage() {
       </div>
 
       {/* System Overview */}
+      {loading ? (
+        <div className="flex justify-center items-center h-40">
+          <span className="text-muted-foreground">Loading system metrics...</span>
+        </div>
+      ) : (
       <div className="grid gap-6 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>CPU Usage</CardDescription>
-            <CardTitle className="text-3xl">65%</CardTitle>
+            <CardTitle className="text-3xl">{metrics?.cpu?.usage ?? "-"}%</CardTitle>
           </CardHeader>
           <CardContent>
-            <Progress value={65} className="h-2" />
+            <Progress value={metrics?.cpu?.usage ?? 0} className="h-2" />
             <div className="mt-2 flex items-center text-xs text-muted-foreground">
               <Cpu className="mr-1 h-4 w-4 text-primary" />
-              <span>8 cores, 3.5 GHz</span>
+              <span>{metrics?.cpu?.cores ?? "-"} cores, {metrics?.cpu?.speed ?? "-"}</span>
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Memory Usage</CardDescription>
-            <CardTitle className="text-3xl">42%</CardTitle>
+            <CardTitle className="text-3xl">{metrics?.memory?.usage ?? "-"}%</CardTitle>
           </CardHeader>
           <CardContent>
-            <Progress value={42} className="h-2" />
+            <Progress value={metrics?.memory?.usage ?? 0} className="h-2" />
             <div className="mt-2 flex items-center text-xs text-muted-foreground">
               <Server className="mr-1 h-4 w-4 text-primary" />
-              <span>8.5 GB / 16 GB</span>
+              <span>{metrics?.memory?.used ?? "-"} GB / {metrics?.memory?.total ?? "-"} GB</span>
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Disk Usage</CardDescription>
-            <CardTitle className="text-3xl">65.8%</CardTitle>
+            <CardTitle className="text-3xl">{metrics?.disk?.usage ?? "-"}%</CardTitle>
           </CardHeader>
           <CardContent>
-            <Progress value={65.8} className="h-2" />
+            <Progress value={metrics?.disk?.usage ?? 0} className="h-2" />
             <div className="mt-2 flex items-center text-xs text-muted-foreground">
               <HardDrive className="mr-1 h-4 w-4 text-primary" />
-              <span>329 GB / 500 GB</span>
+              <span>{metrics?.disk?.used ?? "-"} GB / {metrics?.disk?.total ?? "-"} GB</span>
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Network Traffic</CardDescription>
-            <CardTitle className="text-3xl">32 Mbps</CardTitle>
+            <CardTitle className="text-3xl">{metrics?.network?.total ?? "-"} {metrics?.network?.unit ?? "Mbps"}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-green-500">↑ 12 Mbps</span>
-              <span className="text-blue-500">↓ 20 Mbps</span>
+              <span className="text-green-500">↑ {metrics?.network?.up ?? "-"} Mbps</span>
+              <span className="text-blue-500">↓ {metrics?.network?.down ?? "-"} Mbps</span>
             </div>
             <div className="mt-2 flex items-center text-xs text-muted-foreground">
               <Network className="mr-1 h-4 w-4 text-primary" />
@@ -416,6 +438,7 @@ export default function SystemMonitoringPage() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       <Tabs defaultValue="metrics">
         <TabsList className="grid w-full grid-cols-3">
@@ -651,7 +674,7 @@ export default function SystemMonitoringPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {systemServices.map((service) => (
+                    {services.map((service) => (
                       <TableRow key={service.id}>
                         <TableCell className="font-medium">{service.name}</TableCell>
                         <TableCell>{service.type}</TableCell>
@@ -711,7 +734,7 @@ export default function SystemMonitoringPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {recentAlerts.map((alert) => (
+                    {alerts.map((alert) => (
                       <TableRow key={alert.id}>
                         <TableCell>
                           <div className="flex items-center gap-2">

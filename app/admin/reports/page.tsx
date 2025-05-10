@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Download,
   Calendar,
@@ -43,91 +43,95 @@ import {
   Line,
 } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-
-// Mock data for charts
-const monthlyInvestmentData = [
-  { month: "Jan", amount: 120000 },
-  { month: "Feb", amount: 135000 },
-  { month: "Mar", amount: 150000 },
-  { month: "Apr", amount: 165000 },
-  { month: "May", amount: 180000 },
-  { month: "Jun", amount: 210000 },
-  { month: "Jul", amount: 240000 },
-  { month: "Aug", amount: 270000 },
-  { month: "Sep", amount: 300000 },
-  { month: "Oct", amount: 330000 },
-  { month: "Nov", amount: 370000 },
-  { month: "Dec", amount: 420000 },
-]
-
-const userGrowthData = [
-  { month: "Jan", users: 1200 },
-  { month: "Feb", users: 1350 },
-  { month: "Mar", users: 1500 },
-  { month: "Apr", users: 1650 },
-  { month: "May", users: 1800 },
-  { month: "Jun", users: 2100 },
-  { month: "Jul", users: 2400 },
-  { month: "Aug", users: 2700 },
-  { month: "Sep", users: 3000 },
-  { month: "Oct", users: 3300 },
-  { month: "Nov", users: 3700 },
-  { month: "Dec", users: 4200 },
-]
-
-const jarDistributionData = [
-  { name: "12 Month (12%)", value: 45 },
-  { name: "24 Month (14%)", value: 35 },
-  { name: "36 Month (16%)", value: 20 },
-]
-
-const referralData = [
-  { month: "Jan", referrals: 25 },
-  { month: "Feb", referrals: 30 },
-  { month: "Mar", referrals: 35 },
-  { month: "Apr", referrals: 40 },
-  { month: "May", referrals: 45 },
-  { month: "Jun", referrals: 55 },
-  { month: "Jul", referrals: 65 },
-  { month: "Aug", referrals: 75 },
-  { month: "Sep", referrals: 85 },
-  { month: "Oct", referrals: 95 },
-  { month: "Nov", referrals: 110 },
-  { month: "Dec", referrals: 130 },
-]
-
-const conversionRateData = [
-  { month: "Jan", rate: 5.2 },
-  { month: "Feb", rate: 5.5 },
-  { month: "Mar", rate: 5.8 },
-  { month: "Apr", rate: 6.1 },
-  { month: "May", rate: 6.4 },
-  { month: "Jun", rate: 6.8 },
-  { month: "Jul", rate: 7.2 },
-  { month: "Aug", rate: 7.6 },
-  { month: "Sep", rate: 8.0 },
-  { month: "Oct", rate: 8.3 },
-  { month: "Nov", rate: 8.5 },
-  { month: "Dec", rate: 8.7 },
-]
+import { CalendarDateRangePicker } from '@/components/date-range-picker'
+import { format } from 'date-fns'
+import { DateRange } from 'react-day-picker'
 
 const COLORS = ["#204854", "#286578", "#d97a4b", "#dedddd"]
 
 export default function ReportsPage() {
   const [timeframe, setTimeframe] = useState("monthly")
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({ from: undefined, to: undefined })
+  const [dashboard, setDashboard] = useState<any>({})
+  const [jars, setJars] = useState<any[]>([])
+  const [customers, setCustomers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchAll() {
+      setLoading(true)
+      const [dashboardRes, jarsRes, customersRes] = await Promise.all([
+        fetch('/api/admin/dashboard').then(r => r.json()),
+        fetch('/api/admin/jars').then(r => r.json()),
+        fetch('/api/admin/customers').then(r => r.json()),
+      ])
+      setDashboard(dashboardRes)
+      setJars(jarsRes.jars || [])
+      setCustomers(Array.isArray(customersRes) ? customersRes : [])
+      setLoading(false)
+    }
+    fetchAll()
+  }, [])
+
+  // Date range filter logic for all charts (example: filter dashboard.overview by dateRange)
+  // ...
+
+  // Export handler
+  const handleExport = async (formatType: 'csv' | 'excel' | 'pdf') => {
+    // Example: export dashboard.overview as CSV/Excel/PDF
+    const data = dashboard.overview || []
+    if (!data.length) return
+    if (formatType === 'csv') {
+      const csvRows = [
+        Object.keys(data[0]).join(','),
+        ...data.map((row: any) => Object.values(row).map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+      ]
+      const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = `report_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } else if (formatType === 'excel') {
+      const XLSX = await import('xlsx')
+      const ws = XLSX.utils.json_to_sheet(data)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Report')
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = `report_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } else if (formatType === 'pdf') {
+      const { jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+      const doc = new jsPDF()
+      autoTable(doc, {
+        head: [Object.keys(data[0])],
+        body: data.map((row: any) => Object.values(row)),
+      })
+      doc.save(`report_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`)
+    }
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Reports & Analytics</h1>
         <div className="flex items-center gap-2">
-          <Button variant="outline">
-            <Calendar className="mr-2 h-4 w-4" />
-            Date Range
-          </Button>
+          <CalendarDateRangePicker
+            value={dateRange}
+            onChange={(range) => {
+              if (range && typeof (range as any).from !== 'undefined') setDateRange(range as DateRange)
+            }}
+          />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" onClick={() => handleExport('csv')}>
                 <Download className="mr-2 h-4 w-4" />
                 Export Report
                 <ChevronDown className="ml-2 h-4 w-4" />
@@ -136,14 +140,14 @@ export default function ReportsPage() {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Export Format</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <Download className="mr-2 h-4 w-4" /> PDF Report
+              <DropdownMenuItem onClick={() => handleExport('csv')}>
+                <Download className="mr-2 h-4 w-4" /> CSV Data
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('excel')}>
                 <Download className="mr-2 h-4 w-4" /> Excel Spreadsheet
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Download className="mr-2 h-4 w-4" /> CSV Data
+              <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                <Download className="mr-2 h-4 w-4" /> PDF Report
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -165,7 +169,7 @@ export default function ReportsPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Total Users</CardDescription>
-                <CardTitle className="text-3xl">4,253</CardTitle>
+                <CardTitle className="text-3xl">{loading ? '--' : dashboard.totalCustomers?.toLocaleString() ?? '--'}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center text-xs text-muted-foreground">
@@ -178,7 +182,7 @@ export default function ReportsPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Total Invested</CardDescription>
-                <CardTitle className="text-3xl">$4.2M</CardTitle>
+                <CardTitle className="text-3xl">{loading ? '--' : `$${dashboard.totalInvested?.toLocaleString() ?? dashboard.totalValueLocked?.toLocaleString() ?? '--'}`}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center text-xs text-muted-foreground">
@@ -191,7 +195,7 @@ export default function ReportsPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Monthly Revenue</CardDescription>
-                <CardTitle className="text-3xl">$325K</CardTitle>
+                <CardTitle className="text-3xl">{loading ? '--' : `$${dashboard.monthlyRevenue?.toLocaleString() ?? '--'}`}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center text-xs text-muted-foreground">
@@ -204,7 +208,7 @@ export default function ReportsPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Conversion Rate</CardDescription>
-                <CardTitle className="text-3xl">8.7%</CardTitle>
+                <CardTitle className="text-3xl">{loading ? '--' : `${dashboard.conversionRate?.toFixed(2) ?? '--'}%`}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center text-xs text-muted-foreground">
@@ -239,7 +243,7 @@ export default function ReportsPage() {
                   className="h-80"
                 >
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={monthlyInvestmentData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <AreaChart data={dashboard.investmentGrowthData || []} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                       <defs>
                         <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#204854" stopOpacity={0.8} />
@@ -271,7 +275,7 @@ export default function ReportsPage() {
               <CardContent>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={userGrowthData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <BarChart data={dashboard.userGrowthData || []} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" />
                       <YAxis />
@@ -295,7 +299,7 @@ export default function ReportsPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={jarDistributionData}
+                        data={dashboard.jarDistributionData || []}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
@@ -304,7 +308,7 @@ export default function ReportsPage() {
                         dataKey="value"
                         label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                       >
-                        {jarDistributionData.map((entry, index) => (
+                        {(dashboard.jarDistributionData || []).map((entry: any, index: number) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
@@ -324,7 +328,7 @@ export default function ReportsPage() {
               <CardContent>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <RechartsLineChart data={conversionRateData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <RechartsLineChart data={dashboard.conversionRateData || []} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" />
                       <YAxis />
@@ -482,7 +486,7 @@ export default function ReportsPage() {
             <CardContent>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={referralData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <BarChart data={dashboard.referralData || []} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />

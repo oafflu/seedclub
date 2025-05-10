@@ -1347,6 +1347,9 @@ video {
 .w-px {
   width: 1px;
 }
+.w-\[140px\] {
+  width: 140px;
+}
 .min-w-0 {
   min-width: 0px;
 }
@@ -2457,6 +2460,10 @@ video {
 .text-xs {
   font-size: 0.75rem;
   line-height: 1rem;
+}
+.text-4xl {
+  font-size: 2.25rem;
+  line-height: 2.5rem;
 }
 .font-bold {
   font-weight: 700;
