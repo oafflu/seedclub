@@ -1,82 +1,24 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Plus, ArrowUpRight, ArrowDownRight, Clock, CreditCard, BanknoteIcon as Bank } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
-// Mock data for demonstration
-const mockTransactions = [
-  {
-    id: "tx1",
-    type: "deposit",
-    amount: 2000,
-    date: "2024-01-15",
-    description: "Added funds to wallet",
-    method: "Bank Transfer",
-  },
-  {
-    id: "tx2",
-    type: "investment",
-    amount: 5000,
-    date: "2023-12-10",
-    description: "Created Jar",
-    method: "Wallet",
-  },
-  {
-    id: "tx3",
-    type: "interest",
-    amount: 250,
-    date: "2024-01-15",
-    description: "Jar earnings",
-    method: "System",
-  },
-  {
-    id: "tx4",
-    type: "deposit",
-    amount: 1000,
-    date: "2023-11-05",
-    description: "Added funds to wallet",
-    method: "Credit Card",
-  },
-  {
-    id: "tx5",
-    type: "withdrawal",
-    amount: 500,
-    date: "2023-10-20",
-    description: "Withdrawal to bank account",
-    method: "Bank Transfer",
-  },
-]
-
-// MOCK CUSTOMER DATA FOR DEVELOPMENT/DEMO PURPOSES
-const mockCustomer = {
-  id: 'mock-customer-id',
-  firstName: 'Jane',
-  lastName: 'Doe',
-  email: 'jane.doe@example.com',
-  walletBalance: 3750,
-}
-
-// Helper for client-only number formatting
-function useClientFormattedNumber(num: number | string | null | undefined) {
-  const [formatted, setFormatted] = useState<string>("")
-  useEffect(() => {
-    if (num === null || num === undefined) return
-    setFormatted("")
-    setTimeout(() => {
-      setFormatted(Number(num).toLocaleString())
-    }, 0)
-  }, [num])
-  return formatted
+function formatNumber(num: number | string | null | undefined) {
+  if (num === null || num === undefined) return ""
+  return Number(num).toLocaleString()
 }
 
 export default function WalletPage() {
-  const [balance, setBalance] = useState(mockCustomer.walletBalance)
+  const [balance, setBalance] = useState(0)
+  const [transactions, setTransactions] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState("transactions")
+  const [loading, setLoading] = useState(true)
 
   const searchParams = useSearchParams()
   const action = searchParams.get("action")
@@ -84,13 +26,62 @@ export default function WalletPage() {
   useEffect(() => {
     // Handle action query parameter
     if (action === "add-funds") {
-      // Automatically open the deposit modal or scroll to deposit section
       setActiveTab("deposit")
     } else if (action === "withdraw") {
-      // Automatically open the withdraw modal or scroll to withdraw section
       setActiveTab("withdraw")
     }
   }, [action])
+
+  useEffect(() => {
+    async function fetchWalletData() {
+      setLoading(true)
+      try {
+        const supabase = createClientComponentClient()
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.user) {
+          setBalance(0)
+          setTransactions([])
+          setLoading(false)
+          return
+        }
+        // Fetch wallet for this customer
+        const { data: wallet } = await supabase
+          .from("wallets")
+          .select("id, balance")
+          .eq("customer_id", session.user.id)
+          .single()
+        if (!wallet) {
+          setBalance(0)
+          setTransactions([])
+          setLoading(false)
+          return
+        }
+        setBalance(Number(wallet.balance) || 0)
+        // Fetch transactions for this wallet
+        const { data: txs } = await supabase
+          .from("wallet_transactions")
+          .select("id, type, amount, date:created_at, description, method, status")
+          .eq("wallet_id", wallet.id)
+          .order("created_at", { ascending: false })
+        setTransactions(txs || [])
+      } catch {
+        setBalance(0)
+        setTransactions([])
+      }
+      setLoading(false)
+    }
+    fetchWalletData()
+  }, [])
+
+  const formattedBalance = useMemo(() => formatNumber(balance), [balance])
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+      </div>
+    )
+  }
 
   return (
     <div className="container space-y-6 px-4 py-6">
@@ -101,7 +92,7 @@ export default function WalletPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Available Balance</p>
-              <p className="text-2xl font-bold">${useClientFormattedNumber(balance)}</p>
+              <p className="text-2xl font-bold">${formattedBalance}</p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" asChild>
@@ -153,7 +144,7 @@ export default function WalletPage() {
           </CardHeader>
           <CardContent className="p-0 pt-4">
             <ul className="divide-y">
-              {mockTransactions.map((tx) => (
+              {transactions.map((tx) => (
                 <li key={tx.id} className="flex items-center justify-between p-4">
                   <div className="flex items-center">
                     <div
@@ -173,10 +164,10 @@ export default function WalletPage() {
                       {tx.type === "interest" && <Clock className="h-4 w-4" />}
                     </div>
                     <div>
-                      <p className="font-medium">{tx.description}</p>
+                      <p className="font-medium">{tx.description || tx.type}</p>
                       <div className="flex text-xs text-muted-foreground">
-                        <p>{tx.date}</p>
-                        <p className="ml-2">via {tx.method}</p>
+                        <p>{tx.date ? new Date(tx.date).toLocaleDateString() : ""}</p>
+                        <p className="ml-2">{tx.method ? `via ${tx.method}` : null}</p>
                       </div>
                     </div>
                   </div>
@@ -189,8 +180,12 @@ export default function WalletPage() {
                           : ""
                     }`}
                   >
-                    {tx.type === "deposit" || tx.type === "interest" ? "+" : tx.type === "withdrawal" ? "-" : ""}$
-                    {useClientFormattedNumber(tx.amount)}
+                    {tx.type === "deposit" || tx.type === "interest"
+                      ? "+"
+                      : tx.type === "withdrawal"
+                      ? "-"
+                      : ""}
+                    ${formatNumber(tx.amount)}
                   </p>
                 </li>
               ))}

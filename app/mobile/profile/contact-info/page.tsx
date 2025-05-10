@@ -96,7 +96,7 @@ export default function ContactInfoPage() {
     <div className="container space-y-6 px-4 py-6">
       <div className="flex items-center">
         <Button variant="ghost" size="icon" className="mr-2" asChild>
-          <Link href="/profile">
+          <Link href="/mobile/profile">
             <ArrowLeft className="h-5 w-5" />
             <span className="sr-only">Back</span>
           </Link>

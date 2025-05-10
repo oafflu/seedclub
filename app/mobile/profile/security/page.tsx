@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { useRouter } from "next/navigation"
 
 export default function SecurityPage() {
   const [passwordForm, setPasswordForm] = useState({
@@ -27,6 +28,7 @@ export default function SecurityPage() {
   const [loginNotifications, setLoginNotifications] = useState(true)
   const [passwordChangeLoading, setPasswordChangeLoading] = useState(false)
   const { toast } = useToast()
+  const router = useRouter()
 
   const handlePasswordInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -70,11 +72,15 @@ export default function SecurityPage() {
     })
   }
 
+  const handleBack = () => {
+    router.push("/mobile/profile")
+  }
+
   return (
     <div className="container space-y-6 px-4 py-6">
       <div className="flex items-center">
         <Button variant="ghost" size="icon" className="mr-2" asChild>
-          <Link href="/profile">
+          <Link href="/mobile/profile">
             <ArrowLeft className="h-5 w-5" />
             <span className="sr-only">Back</span>
           </Link>
@@ -276,11 +282,15 @@ export default function SecurityPage() {
           </ul>
         </CardContent>
         <CardFooter>
-          <Button variant="outline" className="ml-auto">
+          <Button variant="default" className="ml-auto">
             View All Activity
           </Button>
         </CardFooter>
       </Card>
+
+      <Button variant="secondary" onClick={handleBack} className="mt-4">
+        Back to Profile
+      </Button>
     </div>
   )
 }

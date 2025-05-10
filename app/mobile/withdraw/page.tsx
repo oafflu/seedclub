@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/components/ui/use-toast"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 // Mock data for bank accounts and cards
 const paymentMethods = [
@@ -66,10 +67,47 @@ function useClientRandomRef() {
 export default function WithdrawPage() {
   const [step, setStep] = useState(1)
   const [amount, setAmount] = useState("")
-  const [selectedMethod, setSelectedMethod] = useState(paymentMethods[0].id)
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [isComplete, setIsComplete] = useState(false)
+  const [bankAccounts, setBankAccounts] = useState<any[]>([])
+  const [selectedBankId, setSelectedBankId] = useState("")
   const { toast } = useToast()
+
+  // Fetch user's bank accounts
+  useEffect(() => {
+    async function fetchBankAccounts() {
+      const supabase = createClientComponentClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+      const { data, error } = await supabase
+        .from("customer_bank_accounts")
+        .select("id, bank_name, account_number, routing_number, account_holder_name")
+        .eq("customer_id", session.user.id)
+      if (!error) setBankAccounts(data || [])
+    }
+    fetchBankAccounts()
+  }, [])
+
+  // Handle withdrawal submit
+  const handleWithdraw = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const supabase = createClientComponentClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return
+    const { error } = await supabase
+      .from("wallet_withdrawals")
+      .insert({
+        customer_id: session.user.id,
+        amount: Number(amount),
+        bank_account_id: selectedBankId,
+        status: "pending",
+      })
+    if (!error) {
+      toast({ title: "Withdrawal requested", description: "Your withdrawal request has been submitted." })
+      setAmount("")
+      setSelectedBankId("")
+    } else {
+      toast({ title: "Error", description: error.message })
+    }
+  }
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Only allow numbers and a single decimal point
@@ -99,17 +137,6 @@ export default function WithdrawPage() {
       setStep(2)
     } else if (step === 2) {
       setStep(3)
-    } else if (step === 3) {
-      // Process withdrawal
-      setIsProcessing(true)
-      setTimeout(() => {
-        setIsProcessing(false)
-        setIsComplete(true)
-        toast({
-          title: "Withdrawal initiated",
-          description: `Your withdrawal of ${Number.parseFloat(amount).toLocaleString()} has been initiated and will be processed shortly.`,
-        })
-      }, 2000)
     }
   }
 
@@ -119,7 +146,7 @@ export default function WithdrawPage() {
     }
   }
 
-  const selectedPaymentMethod = paymentMethods.find((method) => method.id === selectedMethod)
+  const selectedPaymentMethod = paymentMethods.find((method) => method.id === selectedBankId)
 
   return (
     <div className="container space-y-6 px-4 py-6">
@@ -132,217 +159,177 @@ export default function WithdrawPage() {
         <h1 className="text-2xl font-bold">Withdraw Funds</h1>
       </div>
 
-      {!isComplete ? (
-        <>
-          {/* Progress indicator */}
-          <div className="flex items-center justify-between px-2">
-            <div className="flex flex-col items-center">
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                  step >= 1 ? "bg-primary text-white" : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {step > 1 ? <Check className="h-5 w-5" /> : "1"}
-              </div>
-              <p className="mt-1 text-xs">Amount</p>
-            </div>
-            <div className="h-1 flex-1 bg-muted my-1">
-              <div className="h-full bg-primary transition-all" style={{ width: step >= 2 ? "100%" : "0%" }}></div>
-            </div>
-            <div className="flex flex-col items-center">
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                  step >= 2 ? "bg-primary text-white" : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {step > 2 ? <Check className="h-5 w-5" /> : "2"}
-              </div>
-              <p className="mt-1 text-xs">Method</p>
-            </div>
-            <div className="h-1 flex-1 bg-muted my-1">
-              <div className="h-full bg-primary transition-all" style={{ width: step >= 3 ? "100%" : "0%" }}></div>
-            </div>
-            <div className="flex flex-col items-center">
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                  step >= 3 ? "bg-primary text-white" : "bg-muted text-muted-foreground"
-                }`}
-              >
-                3
-              </div>
-              <p className="mt-1 text-xs">Confirm</p>
-            </div>
+      {/* Progress indicator */}
+      <div className="flex items-center justify-between px-2">
+        <div className="flex flex-col items-center">
+          <div
+            className={`flex h-8 w-8 items-center justify-center rounded-full ${
+              step === 1 ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+            }`}
+          >
+            {step > 1 ? <Check className="h-5 w-5" /> : "1"}
           </div>
+          <p className="mt-1 text-xs">Amount</p>
+        </div>
+        <div className="h-1 flex-1 bg-muted my-1">
+          <div className="h-full bg-primary transition-all" style={{ width: step > 1 ? "100%" : "0%" }}></div>
+        </div>
+        <div className="flex flex-col items-center">
+          <div
+            className={`flex h-8 w-8 items-center justify-center rounded-full ${
+              step === 2 ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+            }`}
+          >
+            {step > 2 ? <Check className="h-5 w-5" /> : "2"}
+          </div>
+          <p className="mt-1 text-xs">Method</p>
+        </div>
+        <div className="h-1 flex-1 bg-muted my-1">
+          <div className="h-full bg-primary transition-all" style={{ width: step > 2 ? "100%" : "0%" }}></div>
+        </div>
+        <div className="flex flex-col items-center">
+          <div
+            className={`flex h-8 w-8 items-center justify-center rounded-full ${
+              step === 3 ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+            }`}
+          >
+            3
+          </div>
+          <p className="mt-1 text-xs">Confirm</p>
+        </div>
+      </div>
 
-          {step === 1 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Enter Withdrawal Amount</CardTitle>
-                <CardDescription>How much would you like to withdraw?</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">$</div>
-                    <Input
-                      type="text"
-                      placeholder="0.00"
-                      value={amount}
-                      onChange={handleAmountChange}
-                      className="pl-8 text-lg"
-                    />
-                  </div>
-                  <div className="flex justify-between rounded-lg bg-muted p-3">
-                    <span className="text-sm text-muted-foreground">Available Balance</span>
-                    <span className="font-medium">$3,750.00</span>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-end">
-                <Button onClick={handleContinue}>Continue</Button>
-              </CardFooter>
-            </Card>
-          )}
-
-          {step === 2 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Select Withdrawal Method</CardTitle>
-                <CardDescription>Choose where to send your funds</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <RadioGroup value={selectedMethod} onValueChange={setSelectedMethod} className="space-y-3">
-                  {paymentMethods.map((method) => (
-                    <div
-                      key={method.id}
-                      className={`flex cursor-pointer items-center justify-between rounded-md border-2 border-muted p-4 hover:border-accent ${
-                        selectedMethod === method.id ? "border-primary bg-primary/5" : ""
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <RadioGroupItem value={method.id} id={method.id} />
-                        <div className="rounded-full bg-muted p-2">
-                          <method.icon className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <Label htmlFor={method.id} className="font-medium">
-                            {method.name}
-                          </Label>
-                          <p className="text-xs text-muted-foreground">{method.accountNumber}</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                  ))}
-                </RadioGroup>
-                <Button variant="outline" className="mt-4 w-full justify-center" asChild>
-                  <Link href="/mobile/profile/payment-methods">Add New Payment Method</Link>
-                </Button>
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={handleBack}>
-                  Back
-                </Button>
-                <Button onClick={handleContinue}>Continue</Button>
-              </CardFooter>
-            </Card>
-          )}
-
-          {step === 3 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Confirm Withdrawal</CardTitle>
-                <CardDescription>Please review your withdrawal details</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="rounded-lg bg-muted p-4">
-                    <div className="mb-4 flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Amount</span>
-                      <span className="text-xl font-bold">{useClientFormattedNumber(amount)}</span>
-                    </div>
-                    <Separator className="my-2" />
-                    <div className="mb-4 flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Fee</span>
-                      <span className="font-medium">$0.00</span>
-                    </div>
-                    <Separator className="my-2" />
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Total</span>
-                      <span className="text-lg font-bold">{useClientFormattedNumber(amount)}</span>
-                    </div>
-                  </div>
-
-                  <div className="rounded-md border p-4">
-                    <h3 className="mb-2 font-medium">Withdrawal Method</h3>
-                    <div className="flex items-center space-x-3">
-                      {selectedPaymentMethod && (
-                        <>
-                          <div className="rounded-full bg-muted p-2">
-                            <selectedPaymentMethod.icon className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{selectedPaymentMethod.name}</p>
-                            <p className="text-xs text-muted-foreground">{selectedPaymentMethod.accountNumber}</p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-start rounded-lg bg-amber-50 p-4 text-amber-800">
-                    <AlertCircle className="mr-2 h-5 w-5 flex-shrink-0" />
-                    <div className="text-sm">
-                      <p className="font-medium">Processing Time</p>
-                      <p>Withdrawals typically take 1-3 business days to process depending on your bank.</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={handleBack}>
-                  Back
-                </Button>
-                <Button onClick={handleContinue} disabled={isProcessing}>
-                  {isProcessing ? "Processing..." : "Confirm Withdrawal"}
-                </Button>
-              </CardFooter>
-            </Card>
-          )}
-        </>
-      ) : (
+      {step === 1 && (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center p-6 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-              <Check className="h-8 w-8 text-green-600" />
-            </div>
-            <h2 className="mb-2 text-xl font-bold">Withdrawal Initiated</h2>
-            <p className="mb-6 text-muted-foreground">
-              Your withdrawal of ${useClientFormattedNumber(amount)} has been initiated and will be processed shortly.
-            </p>
-            <div className="mb-6 w-full rounded-lg bg-muted p-4">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Amount</span>
-                <span className="font-medium">${useClientFormattedNumber(amount)}</span>
+          <CardHeader>
+            <CardTitle>Enter Withdrawal Amount</CardTitle>
+            <CardDescription>How much would you like to withdraw?</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">$</div>
+                <Input
+                  type="text"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={handleAmountChange}
+                  className="pl-8 text-lg"
+                />
               </div>
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Method</span>
-                <span className="font-medium">{selectedPaymentMethod?.name}</span>
+              <div className="flex justify-between rounded-lg bg-muted p-3">
+                <span className="text-sm text-muted-foreground">Available Balance</span>
+                <span className="font-medium">$3,750.00</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Reference ID</span>
-                <span className="font-medium">{useClientRandomRef()}</span>
-              </div>
-            </div>
-            <div className="flex w-full gap-3">
-              <Button variant="outline" className="flex-1" asChild>
-                <Link href="/mobile/wallet">Go to Wallet</Link>
-              </Button>
-              <Button className="flex-1" asChild>
-                <Link href="/mobile">Back to Home</Link>
-              </Button>
             </div>
           </CardContent>
+          <CardFooter className="flex justify-end">
+            <Button onClick={handleContinue}>Continue</Button>
+          </CardFooter>
+        </Card>
+      )}
+
+      {step === 2 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Select Withdrawal Method</CardTitle>
+            <CardDescription>Choose where to send your funds</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RadioGroup value={selectedBankId} onValueChange={setSelectedBankId} className="space-y-3">
+              {bankAccounts.map((bank) => (
+                <div
+                  key={bank.id}
+                  className={`flex cursor-pointer items-center justify-between rounded-md border-2 border-muted p-4 hover:border-accent ${
+                    selectedBankId === bank.id ? "border-primary bg-primary/5" : ""
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <RadioGroupItem value={bank.id} id={bank.id} />
+                    <div className="rounded-full bg-muted p-2">
+                      <Bank className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <Label htmlFor={bank.id} className="font-medium">
+                        {bank.bank_name}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">{bank.account_number}</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              ))}
+            </RadioGroup>
+            <Button variant="outline" className="mt-4 w-full justify-center" asChild>
+              <Link href="/mobile/profile/payment-methods">Add New Payment Method</Link>
+            </Button>
+          </CardContent>
+          <CardFooter className="flex justify-between">
+            <Button variant="outline" onClick={handleBack}>
+              Back
+            </Button>
+            <Button onClick={handleContinue}>Continue</Button>
+          </CardFooter>
+        </Card>
+      )}
+
+      {step === 3 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Confirm Withdrawal</CardTitle>
+            <CardDescription>Please review your withdrawal details</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="rounded-lg bg-muted p-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Amount</span>
+                  <span className="text-xl font-bold">{useClientFormattedNumber(amount)}</span>
+                </div>
+                <Separator className="my-2" />
+                <div className="mb-4 flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Fee</span>
+                  <span className="font-medium">$0.00</span>
+                </div>
+                <Separator className="my-2" />
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Total</span>
+                  <span className="text-lg font-bold">{useClientFormattedNumber(amount)}</span>
+                </div>
+              </div>
+
+              <div className="rounded-md border p-4">
+                <h3 className="mb-2 font-medium">Withdrawal Method</h3>
+                <div className="flex items-center space-x-3">
+                  {selectedPaymentMethod && (
+                    <>
+                      <div className="rounded-full bg-muted p-2">
+                        <Bank className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{selectedPaymentMethod.name}</p>
+                        <p className="text-xs text-muted-foreground">{selectedPaymentMethod.accountNumber}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-start rounded-lg bg-amber-50 p-4 text-amber-800">
+                <AlertCircle className="mr-2 h-5 w-5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium">Processing Time</p>
+                  <p>Withdrawals typically take 1-3 business days to process depending on your bank.</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-between">
+            <Button variant="outline" onClick={handleBack}>
+              Back
+            </Button>
+            <Button onClick={handleContinue}>Continue</Button>
+          </CardFooter>
         </Card>
       )}
     </div>

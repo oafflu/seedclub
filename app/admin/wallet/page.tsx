@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Search,
   Filter,
@@ -42,6 +42,8 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import Link from "next/link"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { useToast } from "@/components/ui/use-toast"
 
 // Mock data for wallets
 const wallets = [
@@ -180,6 +182,8 @@ export default function WalletManagementPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedWallets, setSelectedWallets] = useState<string[]>([])
   const [viewWallet, setViewWallet] = useState<any>(null)
+  const [withdrawals, setWithdrawals] = useState<any[]>([])
+  const { toast } = useToast()
 
   const filteredWallets = wallets.filter(
     (wallet) =>
@@ -204,6 +208,50 @@ export default function WalletManagementPage() {
   const totalBalance = wallets.reduce((sum, wallet) => sum + wallet.balance, 0)
   const totalPendingDeposits = wallets.reduce((sum, wallet) => sum + wallet.pendingDeposits, 0)
   const totalPendingWithdrawals = wallets.reduce((sum, wallet) => sum + wallet.pendingWithdrawals, 0)
+
+  useEffect(() => {
+    async function fetchWithdrawals() {
+      const supabase = createClientComponentClient()
+      const { data, error } = await supabase
+        .from("wallet_withdrawals")
+        .select(`id, amount, status, created_at, customer_id, bank_account_id,
+          customer:customer_id (id, full_name, email),
+          bank:bank_account_id (id, bank_name, account_number, routing_number, account_holder_name)`)
+        .order("created_at", { ascending: false })
+      if (!error) setWithdrawals(data || [])
+    }
+    fetchWithdrawals()
+  }, [])
+
+  // Approve withdrawal
+  async function handleApprove(withdrawalId: string) {
+    const supabase = createClientComponentClient()
+    const { error } = await supabase
+      .from("wallet_withdrawals")
+      .update({ status: "paid" })
+      .eq("id", withdrawalId)
+    if (!error) {
+      setWithdrawals((prev) => prev.map(w => w.id === withdrawalId ? { ...w, status: "paid" } : w))
+      toast({ title: "Withdrawal marked as Paid" })
+    } else {
+      toast({ title: "Error", description: error.message, variant: "destructive" })
+    }
+  }
+
+  // Deny withdrawal
+  async function handleDeny(withdrawalId: string) {
+    const supabase = createClientComponentClient()
+    const { error } = await supabase
+      .from("wallet_withdrawals")
+      .update({ status: "cancelled" })
+      .eq("id", withdrawalId)
+    if (!error) {
+      setWithdrawals((prev) => prev.map(w => w.id === withdrawalId ? { ...w, status: "cancelled" } : w))
+      toast({ title: "Withdrawal marked as Cancelled" })
+    } else {
+      toast({ title: "Error", description: error.message, variant: "destructive" })
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -582,6 +630,66 @@ export default function WalletManagementPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Add a section for customer withdrawal requests */}
+      <div className="mt-10">
+        <h2 className="text-xl font-bold mb-4">Customer Withdrawal Requests</h2>
+        <Card>
+          <CardHeader>
+            <CardTitle>Withdrawal Requests</CardTitle>
+            <CardDescription>Review and process customer withdrawal requests</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {withdrawals.length === 0 ? (
+              <div className="text-center text-muted-foreground">No withdrawal requests found.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead>
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Bank Name</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Account Number</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Routing Number</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Account Holder</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {withdrawals.map((w) => (
+                      <tr key={w.id}>
+                        <td className="px-4 py-2 whitespace-nowrap">{w.created_at ? new Date(w.created_at).toLocaleString() : ""}</td>
+                        <td className="px-4 py-2 whitespace-nowrap">{w.customer?.full_name || w.customer?.id || "-"}</td>
+                        <td className="px-4 py-2 whitespace-nowrap">{w.customer?.email || "-"}</td>
+                        <td className="px-4 py-2 whitespace-nowrap font-semibold">${Number(w.amount).toLocaleString()}</td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${w.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : w.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{w.status === 'pending' ? 'Pending' : w.status === 'paid' ? 'Paid' : 'Cancelled'}</span>
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">{w.bank?.bank_name || "-"}</td>
+                        <td className="px-4 py-2 whitespace-nowrap">{w.bank?.account_number || "-"}</td>
+                        <td className="px-4 py-2 whitespace-nowrap">{w.bank?.routing_number || "-"}</td>
+                        <td className="px-4 py-2 whitespace-nowrap">{w.bank?.account_holder_name || "-"}</td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          {w.status === 'pending' && (
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="default" onClick={() => handleApprove(w.id)}>Approve</Button>
+                              <Button size="sm" variant="destructive" onClick={() => handleDeny(w.id)}>Deny</Button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

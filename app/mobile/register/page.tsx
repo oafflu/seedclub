@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { Eye, EyeOff } from "lucide-react"
@@ -31,9 +31,17 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [acceptTerms, setAcceptTerms] = useState(false)
   const [country, setCountry] = useState("")
+  const [referralCode, setReferralCode] = useState("")
   const router = useRouter()
   const { toast } = useToast()
   const supabase = createClientComponentClient()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    // Autofill referral code from URL param if present
+    const code = searchParams.get("ref")
+    if (code) setReferralCode(code)
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -117,14 +125,14 @@ export default function RegisterPage() {
         return
       }
 
-      // 3. Insert into customer_profiles
+      // 3. Insert into customer_profiles (let trigger set referral_code)
       const { error: profileError } = await supabase
         .from("customer_profiles")
         .insert([
           {
             customer_id: user.id,
             country: country,
-            // ... add other fields as needed
+            referral_code: null // let trigger set it
           }
         ])
 
@@ -136,6 +144,28 @@ export default function RegisterPage() {
         })
         setIsLoading(false)
         return
+      }
+
+      // 4. If referralCode is provided, look up referrer and create referral row
+      if (referralCode) {
+        // Find referrer by code
+        const { data: referrerProfile } = await supabase
+          .from("customer_profiles")
+          .select("customer_id")
+          .eq("referral_code", referralCode)
+          .single()
+        if (referrerProfile && referrerProfile.customer_id) {
+          // Create referral row
+          await supabase
+            .from("referrals")
+            .insert([
+              {
+                referrer_id: referrerProfile.customer_id,
+                referred_id: user.id,
+                status: "pending"
+              }
+            ])
+        }
       }
 
       toast({
@@ -222,6 +252,15 @@ export default function RegisterPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="referralCode">Referral Code (optional)</Label>
+              <Input
+                id="referralCode"
+                placeholder="Enter referral code if you have one"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>

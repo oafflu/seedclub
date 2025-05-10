@@ -360,7 +360,13 @@ CREATE TABLE referral_campaigns (
     is_active BOOLEAN DEFAULT TRUE,
     created_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    -- Contest/Leaderboard fields
+    is_contest BOOLEAN DEFAULT FALSE,
+    prize_1st VARCHAR(100),
+    prize_2nd VARCHAR(100),
+    prize_3rd VARCHAR(100),
+    status VARCHAR(50) DEFAULT 'active'
 );
 
 -- Referrals Table
@@ -377,6 +383,19 @@ CREATE TABLE referrals (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(referrer_id, referred_id)
 );
+
+-- Leaderboard RPC for campaign
+CREATE OR REPLACE FUNCTION get_campaign_leaderboard(campaign_id UUID)
+RETURNS TABLE (id UUID, nickname TEXT, referrals_count INTEGER)
+AS $$
+  SELECT r.referrer_id AS id, cp.nickname, COUNT(*) AS referrals_count
+  FROM referrals r
+  JOIN customer_profiles cp ON r.referrer_id = cp.customer_id
+  WHERE r.campaign_id = get_campaign_leaderboard.campaign_id
+    AND r.status = 'completed'
+  GROUP BY r.referrer_id, cp.nickname
+  ORDER BY referrals_count DESC, cp.nickname ASC
+$$ LANGUAGE sql;
 
 -- SYSTEM MONITORING
 -- ================

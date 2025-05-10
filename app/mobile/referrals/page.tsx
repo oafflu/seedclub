@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Share2,
   Copy,
@@ -34,55 +34,9 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-
-// Mock data for demonstration
-const mockReferrals = [
-  {
-    id: "ref1",
-    name: "John Doe",
-    email: "john.doe@example.com",
-    status: "completed",
-    date: "2023-12-15",
-    reward: 50,
-    level: 1,
-  },
-  {
-    id: "ref2",
-    name: "Jane Smith",
-    email: "jane.smith@example.com",
-    status: "pending",
-    date: "2024-01-10",
-    reward: 50,
-    level: 1,
-  },
-  {
-    id: "ref3",
-    name: "Bob Johnson",
-    email: "bob.johnson@example.com",
-    status: "completed",
-    date: "2023-11-20",
-    reward: 50,
-    level: 1,
-  },
-  {
-    id: "ref4",
-    name: "Alice Williams",
-    email: "alice@example.com",
-    status: "completed",
-    date: "2023-10-15",
-    reward: 50,
-    level: 1,
-  },
-]
-
-// Mock data for leaderboard
-const mockLeaderboard = [
-  { id: "user1", name: "Sarah Johnson", nickname: "InvestorPro", referrals: 124, rank: 1 },
-  { id: "user2", name: "Michael Chen", nickname: "GrowthMaster", referrals: 87, rank: 2 },
-  { id: "user3", name: "David Wilson", nickname: "SeedKing", referrals: 56, rank: 3 },
-  { id: "user4", name: "Emma Davis", nickname: "WealthBuilder", referrals: 32, rank: 4 },
-  { id: "user5", name: "Current User", nickname: "YourNickname", referrals: 3, rank: 42, isCurrentUser: true },
-]
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { nanoid } from "nanoid"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
 // Referral tiers
 const referralTiers = [
@@ -153,18 +107,26 @@ export default function ReferralsPage() {
   )
   const [showCustomization, setShowCustomization] = useState(false)
   const [selectedPlatform, setSelectedPlatform] = useState("")
-  const [nickname, setNickname] = useState("YourNickname")
+  const [nickname, setNickname] = useState("")
+  const [myReferrals, setMyReferrals] = useState<any[]>([])
+  const [referralStats, setReferralStats] = useState<any>({ completed: 0, pending: 0, total: 0, rewards: 0 })
+  const [leaderboard, setLeaderboard] = useState<any[]>([])
+  const [referralCode, setReferralCode] = useState("")
+  const [referralLink, setReferralLink] = useState("")
+  const [userId, setUserId] = useState("")
+  const [activeContest, setActiveContest] = useState<any>(null)
+  const [contestCountdown, setContestCountdown] = useState("")
+  const [contestRank, setContestRank] = useState<number | null>(null)
+  const [allCampaigns, setAllCampaigns] = useState<any[]>([])
+  const [showCampaignsDialog, setShowCampaignsDialog] = useState(false)
+  const [showLeaderboardDialog, setShowLeaderboardDialog] = useState(false)
+  const [contestLeaderboard, setContestLeaderboard] = useState<any[]>([])
 
-  const referralCode = "SEED123456"
-  const referralLink = `https://seedclub.com/ref/${referralCode}`
+  const totalEarned = referralStats.rewards
 
-  const totalEarned = mockReferrals
-    .filter((ref) => ref.status === "completed")
-    .reduce((sum, ref) => sum + ref.reward, 0)
-
-  const pendingReferrals = mockReferrals.filter((ref) => ref.status === "pending").length
-  const completedReferrals = mockReferrals.filter((ref) => ref.status === "completed").length
-  const totalReferrals = completedReferrals + pendingReferrals
+  const pendingReferrals = referralStats.pending
+  const completedReferrals = referralStats.completed
+  const totalReferrals = referralStats.total
 
   // Calculate current tier
   const currentTier =
@@ -191,7 +153,7 @@ export default function ReferralsPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const shareToSocial = (platform) => {
+  const shareToSocial = (platform: string) => {
     let shareUrl = ""
     const message = encodeURIComponent(`${customMessage} ${referralLink}`)
 
@@ -227,6 +189,120 @@ export default function ReferralsPage() {
     }
 
     window.open(shareUrl, "_blank")
+  }
+
+  useEffect(() => {
+    async function fetchData() {
+      const supabase = createClientComponentClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+      setUserId(session.user.id)
+      // Fetch nickname from customer_profiles
+      const { data: profile } = await supabase
+        .from("customer_profiles")
+        .select("nickname, referral_code")
+        .eq("customer_id", session.user.id)
+        .single()
+      let nick = profile?.nickname
+      if (!nick) {
+        // Generate random nickname
+        const randomNick = `GreenOak${Math.floor(100 + Math.random() * 900)}`
+        await supabase.from("customer_profiles").update({ nickname: randomNick }).eq("customer_id", session.user.id)
+        setNickname(randomNick)
+      } else {
+        setNickname(nick)
+      }
+      // Fetch my referrals
+      const { data: referrals, error } = await supabase
+        .from("referrals")
+        .select(`*, referred:referred_id (id, first_name, last_name, email)`)
+        .eq("referrer_id", session.user.id)
+        .order("created_at", { ascending: false })
+      setMyReferrals(referrals || [])
+      // Stats
+      const completed = (referrals || []).filter(r => r.status === "completed").length
+      const pending = (referrals || []).filter(r => r.status === "pending").length
+      const rewards = (referrals || []).filter(r => r.status === "completed").reduce((sum, r) => sum + Number(r.reward_amount || 0), 0)
+      setReferralStats({ completed, pending, total: (referrals || []).length, rewards })
+      // Fetch leaderboard
+      const { data: leaderboardData } = await supabase.rpc("get_top_referrers")
+      setLeaderboard(leaderboardData || [])
+      // Fetch referral code/link (assume stored in customer_profiles or customers)
+      if (profile?.referral_code) {
+        setReferralCode(profile.referral_code)
+        setReferralLink(`${window.location.origin}/ref/${profile.referral_code}`)
+      }
+    }
+    fetchData()
+  }, [])
+
+  useEffect(() => {
+    async function fetchContestCampaign() {
+      const supabase = createClientComponentClient()
+      // Fetch active contest campaign
+      const now = new Date().toISOString()
+      const { data: contests } = await supabase
+        .from("referral_campaigns")
+        .select("*")
+        .eq("is_contest", true)
+        .eq("status", "active")
+      const active = (contests || []).find(c => c.start_date <= now && (!c.end_date || c.end_date >= now))
+      setActiveContest(active || null)
+      // Fetch all running campaigns
+      const { data: campaigns } = await supabase
+        .from("referral_campaigns")
+        .select("*")
+        .eq("status", "active")
+      setAllCampaigns(campaigns || [])
+      // Fetch user rank in contest
+      if (active && userId) {
+        const { data: leaderboard } = await supabase.rpc("get_campaign_leaderboard", { campaign_id: active.id })
+        if (leaderboard && Array.isArray(leaderboard)) {
+          const rank = leaderboard.findIndex(u => u.id === userId)
+          setContestRank(rank >= 0 ? rank + 1 : null)
+        }
+      }
+    }
+    fetchContestCampaign()
+  }, [userId])
+
+  // Countdown timer for contest end
+  useEffect(() => {
+    if (!activeContest?.end_date) return
+    const interval = setInterval(() => {
+      const now = new Date()
+      const end = new Date(activeContest.end_date)
+      const diff = end.getTime() - now.getTime()
+      if (diff <= 0) {
+        setContestCountdown("Ended")
+        clearInterval(interval)
+      } else {
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+        const hours = Math.floor((diff / (1000 * 60 * 60)) % 24)
+        const minutes = Math.floor((diff / (1000 * 60)) % 60)
+        setContestCountdown(`${days}d ${hours}h ${minutes}m left`)
+      }
+    }, 60000)
+    return () => clearInterval(interval)
+  }, [activeContest])
+
+  // Fetch leaderboard when dialog opens
+  useEffect(() => {
+    if (!showLeaderboardDialog || !activeContest?.id) return
+    async function fetchLeaderboard() {
+      const supabase = createClientComponentClient()
+      const { data } = await supabase.rpc("get_campaign_leaderboard", { campaign_id: activeContest.id })
+      setContestLeaderboard(data || [])
+    }
+    fetchLeaderboard()
+  }, [showLeaderboardDialog, activeContest])
+
+  // Update nickname in DB when changed
+  async function handleNicknameChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const newNick = e.target.value
+    setNickname(newNick)
+    const supabase = createClientComponentClient()
+    await supabase.from("customer_profiles").update({ nickname: newNick }).eq("customer_id", userId)
   }
 
   return (
@@ -478,9 +554,9 @@ export default function ReferralsPage() {
               </Tabs>
             </CardHeader>
             <CardContent className="p-0 pt-4">
-              {mockReferrals.length > 0 ? (
+              {myReferrals.length > 0 ? (
                 <ul className="divide-y">
-                  {mockReferrals
+                  {myReferrals
                     .filter((ref) => {
                       if (activeTab === "all") return true
                       return ref.status === activeTab
@@ -599,7 +675,7 @@ export default function ReferralsPage() {
                   <div className="col-span-4 text-right">Referrals</div>
                 </div>
                 <div className="divide-y">
-                  {mockLeaderboard.map((user) => (
+                  {leaderboard.map((user) => (
                     <div key={user.id} className={`grid grid-cols-12 p-3 ${user.isCurrentUser ? "bg-primary/5" : ""}`}>
                       <div className="col-span-1">
                         {user.rank <= 3 ? (
@@ -645,13 +721,13 @@ export default function ReferralsPage() {
                 <Award className="mr-2 h-5 w-5 text-amber-500" />
                 Monthly Referral Contest
               </CardTitle>
-              <CardDescription>Ends in 12 days</CardDescription>
+              <CardDescription>Ends in {contestCountdown}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg border p-4 bg-gradient-to-br from-amber-50 to-yellow-50">
-                <h3 className="text-lg font-bold">April Contest: Spring Referrals</h3>
+                <h3 className="text-lg font-bold">{activeContest?.name || "No Active Contest"}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Refer the most friends this month to win exclusive prizes!
+                  {activeContest?.description || "No description available"}
                 </p>
 
                 <div className="mt-4 space-y-3">
@@ -659,35 +735,39 @@ export default function ReferralsPage() {
                     <div className="mr-2 mt-0.5 text-yellow-500">🥇</div>
                     <div>
                       <p className="font-medium">1st Place</p>
-                      <p className="text-sm text-muted-foreground">$500 bonus</p>
+                      <p className="text-sm text-muted-foreground">${activeContest?.prize1 || "N/A"}</p>
                     </div>
                   </div>
                   <div className="flex items-start">
                     <div className="mr-2 mt-0.5 text-gray-400">🥈</div>
                     <div>
                       <p className="font-medium">2nd Place</p>
-                      <p className="text-sm text-muted-foreground">$250 bonus</p>
+                      <p className="text-sm text-muted-foreground">${activeContest?.prize2 || "N/A"}</p>
                     </div>
                   </div>
                   <div className="flex items-start">
                     <div className="mr-2 mt-0.5 text-amber-600">🥉</div>
                     <div>
                       <p className="font-medium">3rd Place</p>
-                      <p className="text-sm text-muted-foreground">$100 bonus</p>
+                      <p className="text-sm text-muted-foreground">${activeContest?.prize3 || "N/A"}</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-4">
                   <p className="text-sm font-medium">
-                    Your current position: <span className="text-primary">14th</span>
+                    Your current position: <span className="text-primary">{contestRank ? contestRank.toLocaleString() : "N/A"}</span>
                   </p>
-                  <p className="text-xs text-muted-foreground">You need 4 more referrals to reach the top 10</p>
+                  <p className="text-xs text-muted-foreground">You need {activeContest?.required_referrals - totalReferrals || "N/A"} more referrals to reach the top 10</p>
                 </div>
               </div>
 
               <Button className="w-full bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700">
                 <Share2 className="mr-2 h-4 w-4" /> Share Now to Climb the Ranks
+              </Button>
+
+              <Button className="w-full mt-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white" onClick={() => setShowLeaderboardDialog(true)}>
+                <Trophy className="mr-2 h-5 w-5" /> View Full Leaderboard
               </Button>
             </CardContent>
           </Card>
@@ -729,7 +809,7 @@ export default function ReferralsPage() {
               <Input
                 id="referral-nickname"
                 value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
+                onChange={handleNicknameChange}
                 className="w-full"
               />
             </div>
@@ -806,6 +886,50 @@ export default function ReferralsPage() {
           </ol>
         </CardContent>
       </Card>
+
+      {/* View All Campaigns Dialog */}
+      <Dialog open={showCampaignsDialog} onOpenChange={setShowCampaignsDialog}>
+        <DialogTrigger className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white">
+          <Gift className="mr-2 h-5 w-5" />
+          View All Campaigns
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>All Campaigns</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {allCampaigns.map((campaign) => (
+              <div key={campaign.id} className="flex items-center space-x-4 space-y-0">
+                <span>{campaign.name}</span>
+                <p className="text-sm text-muted-foreground">{campaign.description}</p>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Leaderboard Dialog */}
+      <Dialog open={showLeaderboardDialog} onOpenChange={setShowLeaderboardDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Contest Leaderboard</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-2 py-2">
+            {contestLeaderboard.length === 0 ? (
+              <div className="text-center text-muted-foreground">No leaderboard data yet.</div>
+            ) : (
+              contestLeaderboard.map((entry, idx) => (
+                <div key={entry.id} className={`flex items-center justify-between p-2 rounded ${entry.id === userId ? 'bg-primary/10 font-bold' : ''}`}> 
+                  <span className="w-8 text-center">{idx + 1}</span>
+                  <span className="flex-1 truncate">{entry.nickname || 'Anonymous'}</span>
+                  <span className="w-12 text-right">{entry.referrals_count}</span>
+                  {entry.id === userId && <span className="ml-2 text-xs text-primary">(You)</span>}
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ArrowLeft, BanknoteIcon as Bank, CreditCard, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function AddFundsPage() {
   const router = useRouter()
@@ -21,34 +22,66 @@ export default function AddFundsPage() {
   const [paymentMethod, setPaymentMethod] = useState(initialMethod)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isComplete, setIsComplete] = useState(false)
+  const [stripeSessionId, setStripeSessionId] = useState("")
 
   // Predefined amounts
   const quickAmounts = [100, 500, 1000, 5000]
 
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!amount) return
-
     setIsProcessing(true)
-
-    // Simulate processing
-    setTimeout(() => {
+    try {
+      // Get current user
+      const supabase = createClientComponentClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
+        setIsProcessing(false)
+        return
+      }
+      // Call API to create Stripe Checkout session
+      const res = await fetch("/api/wallet/create-stripe-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: Number(amount),
+          customer_id: session.user.id,
+          email: session.user.email,
+        })
+      })
+      const data = await res.json()
+      if (data.sessionId && data.stripePublicKey) {
+        setStripeSessionId(data.sessionId)
+        // Redirect to Stripe Checkout
+        const stripe = await import("@stripe/stripe-js").then(m => m.loadStripe(data.stripePublicKey))
+        if (stripe) {
+          await stripe.redirectToCheckout({ sessionId: data.sessionId })
+        }
+      } else {
+        setIsProcessing(false)
+      }
+    } catch {
       setIsProcessing(false)
-      setIsComplete(true)
+    }
+  }
 
-      // Redirect back to wallet after completion
+  // Handle Stripe redirect/callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get("stripe_success")) {
+      setIsComplete(true)
       setTimeout(() => {
         router.push("/wallet")
       }, 2000)
-    }, 1500)
-  }
+    }
+  }, [router])
 
   return (
     <div className="container space-y-6 px-4 py-6">
       <div className="flex items-center">
-        <Button variant="ghost" size="icon" asChild className="mr-2">
-          <Link href="/wallet">
+        <Button variant="ghost" size="icon" className="mr-2" asChild>
+          <Link href="/mobile/wallet">
             <ArrowLeft className="h-5 w-5" />
             <span className="sr-only">Back</span>
           </Link>

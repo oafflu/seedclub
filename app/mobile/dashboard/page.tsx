@@ -17,6 +17,95 @@ const mockCustomer = {
   email: 'jane.doe@example.com',
 }
 
+// Add JarCard component for each customer jar
+function JarCard({ custJar, adminJar, termObj }: { custJar: any, adminJar: any, termObj: any }) {
+  const [simulatedProgress, setSimulatedProgress] = useState(custJar.progress)
+  // Simple interest calculation
+  function calculateSimpleInterest(amount: number, apy: number, progress: number) {
+    return (amount * (apy / 100) * (progress / 100)).toFixed(2)
+  }
+  const currentProfit = Number(calculateSimpleInterest(custJar.investedAmount, termObj.apy, custJar.progress))
+  const projectedProfit = Number(calculateSimpleInterest(custJar.investedAmount, termObj.apy, simulatedProgress))
+  const maturityDate = (() => {
+    const d = new Date(custJar.startDate)
+    d.setMonth(d.getMonth() + Number(custJar.term))
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  })()
+  return (
+    <Card className="bg-white rounded-[20px] shadow-sm overflow-hidden">
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 relative">
+              {adminJar.icon_name ? (
+                <img src={adminJar.icon_name} alt={adminJar.name} width={40} height={40} />
+              ) : (
+                <span className="h-10 w-10 bg-muted rounded-full block" />
+              )}
+            </div>
+            <span className="text-[16px] font-medium text-gray-900">{adminJar.name || 'Jar'}</span>
+          </div>
+          <div className="bg-[#ECFDF3] px-2.5 py-1 rounded-full">
+            <p className="text-[13px] text-[#039855] font-medium flex items-center gap-1">
+              <span className="text-lg">↗</span> {termObj.apy}% Growth for {termObj.term} months
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div>
+            <p className="text-[13px] text-gray-500 mb-1">Amount Invested</p>
+            <p className="text-[20px] font-semibold text-gray-900">${custJar.investedAmount.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-[13px] text-gray-500 mb-1">Maturity Date</p>
+            <div className="flex items-center gap-1.5">
+              <Calendar className="h-4 w-4 text-gray-500" />
+              <p className="text-[15px] text-gray-900">{maturityDate}</p>
+            </div>
+          </div>
+        </div>
+        <div className="mb-4">
+          <div className="flex justify-between text-[13px] mb-2">
+            <span className="text-gray-600">Maturity Progress</span>
+            <span className="text-gray-600">{custJar.progress}% Complete</span>
+          </div>
+          <div className="relative">
+            <div className="h-[4px] w-full bg-gray-200 rounded-full">
+              <div className="absolute top-0 left-0 h-[4px] bg-[#1B4242] rounded-full" style={{ width: `${custJar.progress}%` }} />
+            </div>
+          </div>
+        </div>
+        <div className="mb-6">
+          <div className="flex justify-between text-[13px] mb-2">
+            <span className="text-gray-600">Current: {custJar.progress}%</span>
+            <span className="text-gray-600">Simulated: {simulatedProgress}%</span>
+          </div>
+          <div className="relative h-4 flex items-center">
+            <div className="absolute top-[6px] left-0 h-1 bg-[#1B4242] rounded-full" style={{ width: `${custJar.progress}%` }} />
+            <Slider
+              defaultValue={[custJar.progress]}
+              max={100}
+              step={1}
+              className="absolute w-full"
+              onValueChange={(value) => setSimulatedProgress(value[0])}
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-[13px] text-gray-500 mb-1">Current Profit</p>
+            <p className="text-[15px] text-[#039855] font-medium">+${currentProfit.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-[13px] text-gray-500 mb-1">Projected Profit</p>
+            <p className="text-[15px] text-[#039855] font-medium">+${projectedProfit.toLocaleString()}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function MobileDashboard() {
   const [userName, setUserName] = useState(`${mockCustomer.firstName} ${mockCustomer.lastName}`)
   const [isLoading, setIsLoading] = useState(true)
@@ -48,6 +137,11 @@ export default function MobileDashboard() {
     investedAmount: 3000,
     growthRate: 15,
   })
+
+  // State for admin jars and interest settings
+  const [adminJars, setAdminJars] = useState<any[]>([])
+  const [interestSettings, setInterestSettings] = useState<any[]>([])
+  const [customerJars, setCustomerJars] = useState<any[]>([])
 
   useEffect(() => {
     setMounted(true)
@@ -93,9 +187,53 @@ export default function MobileDashboard() {
     fetchUserName()
   }, [mounted, router])
 
-  const calculateProjectedProfit = (amount: number, rate: number, progress: number) => {
-    return (amount * (rate / 100) * (progress / 100)).toFixed(2)
-  }
+  // Fetch admin jars and interest settings on mount
+  useEffect(() => {
+    if (!mounted) return
+    async function fetchData() {
+      try {
+        const jarsRes = await fetch("/api/admin/jars")
+        const jarsJson = await jarsRes.json()
+        setAdminJars(jarsJson.jars || [])
+        const termsRes = await fetch("/api/admin/settings/investment")
+        const termsJson = await termsRes.json()
+        setInterestSettings(Array.isArray(termsJson.jars) ? termsJson.jars : [])
+        // Mock customer jars (simulate investments)
+        setCustomerJars([
+          {
+            id: 'cust-jar-1',
+            jarId: jarsJson.jars?.[0]?.id || '',
+            investedAmount: 5000,
+            startDate: '2024-01-01',
+            term: 12, // months
+            progress: 5, // percent
+          },
+          {
+            id: 'cust-jar-2',
+            jarId: jarsJson.jars?.[1]?.id || '',
+            investedAmount: 10000,
+            startDate: '2024-01-15',
+            term: 24,
+            progress: 10,
+          },
+          {
+            id: 'cust-jar-3',
+            jarId: jarsJson.jars?.[2]?.id || '',
+            investedAmount: 3000,
+            startDate: '2024-02-15',
+            term: 36,
+            progress: 8,
+          },
+        ])
+      } catch (e) {
+        // fallback: no jars
+        setAdminJars([])
+        setInterestSettings([])
+        setCustomerJars([])
+      }
+    }
+    fetchData()
+  }, [mounted])
 
   if (!mounted || isLoading || userName === null) {
     return (
@@ -198,306 +336,17 @@ export default function MobileDashboard() {
             <h2 className="text-[20px] font-semibold text-[#1A1A1A]">Your Jars</h2>
             <p className="text-[14px] text-gray-600">Drag to simulate growth</p>
           </div>
-
-          {/* Sprout Fund Jar */}
-          <Card className="bg-white rounded-[20px] shadow-sm overflow-hidden">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 relative">
-                    <Image 
-                      src="/assets/icons/sprout-jar.svg" 
-                      alt="Sprout Fund" 
-                      width={20} 
-                      height={20}
-                    />
-                  </div>
-                  <span className="text-[16px] font-medium text-gray-900">Sprout Fund</span>
-                </div>
-                <div className="bg-[#ECFDF3] px-2.5 py-1 rounded-full">
-                  <p className="text-[13px] text-[#039855] font-medium flex items-center gap-1">
-                    <span className="text-lg">↗</span> 10% Growth for 12 months
-                  </p>
-                </div>
+          {customerJars.map((custJar, idx) => {
+            const adminJar = adminJars.find(j => j.id === custJar.jarId) || {}
+            const termObj = interestSettings.find(t => String(t.term) === String(custJar.term)) || interestSettings[0] || { apy: 0, term: custJar.term }
+            // Add mb-6 to all but the last card
+            const isLast = idx === customerJars.length - 1
+            return (
+              <div key={custJar.id} className={!isLast ? 'mb-6' : ''}>
+                <JarCard custJar={custJar} adminJar={adminJar} termObj={termObj} />
               </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                  <p className="text-[13px] text-gray-500 mb-1">Amount Invested</p>
-                  <p className="text-[20px] font-semibold text-gray-900">$5,000</p>
-                </div>
-                <div>
-                  <p className="text-[13px] text-gray-500 mb-1">Maturity Date</p>
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4 text-gray-500" />
-                    <p className="text-[15px] text-gray-900">Dec 15, 2025</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <div className="flex justify-between text-[13px] mb-2">
-                  <span className="text-gray-600">Maturity Progress</span>
-                  <span className="text-gray-600">{sproutFundSimulation.currentProgress}% Complete</span>
-                </div>
-                <div className="relative">
-                  <div className="h-[4px] w-full bg-gray-200 rounded-full">
-                    <div 
-                      className="absolute top-0 left-0 h-[4px] bg-[#1B4242] rounded-full" 
-                      style={{ width: `${sproutFundSimulation.currentProgress}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <div className="flex justify-between text-[13px] mb-2">
-                  <span className="text-gray-600">Current: {sproutFundSimulation.currentProgress}%</span>
-                  <span className="text-gray-600">Simulated: {sproutFundSimulation.simulatedProgress}%</span>
-                </div>
-                <div className="relative h-4 flex items-center">
-                  <div 
-                    className="absolute top-[6px] left-0 h-1 bg-[#1B4242] rounded-full" 
-                    style={{ width: `${sproutFundSimulation.currentProgress}%` }}
-                  />
-                  <Slider
-                    defaultValue={[sproutFundSimulation.currentProgress]}
-                    max={100}
-                    step={1}
-                    className="absolute w-full"
-                    onValueChange={(value) => {
-                      const simulatedValue = value[0]
-                      const projectedProfit = calculateProjectedProfit(
-                        sproutFundSimulation.investedAmount,
-                        sproutFundSimulation.growthRate,
-                        simulatedValue
-                      )
-                      setSproutFundSimulation(prev => ({
-                        ...prev,
-                        simulatedProgress: simulatedValue,
-                        projectedProfit: Number(projectedProfit)
-                      }))
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-[13px] text-gray-500 mb-1">Current Profit</p>
-                  <p className="text-[15px] text-[#039855] font-medium">
-                    +${sproutFundSimulation.currentProfit.toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[13px] text-gray-500 mb-1">Projected Profit</p>
-                  <p className="text-[15px] text-[#039855] font-medium">
-                    +${sproutFundSimulation.projectedProfit.toFixed(2)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Sapling Stash Jar */}
-          <Card className="bg-white rounded-[20px] shadow-sm overflow-hidden mt-4">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 relative">
-                    <Image 
-                      src="/assets/icons/sapling-jar.svg" 
-                      alt="Sapling Stash" 
-                      width={20} 
-                      height={20}
-                    />
-                  </div>
-                  <span className="text-[16px] font-medium text-gray-900">Sapling Stash</span>
-                </div>
-                <div className="bg-[#ECFDF3] px-2.5 py-1 rounded-full">
-                  <p className="text-[13px] text-[#039855] font-medium flex items-center gap-1">
-                    <span className="text-lg">↗</span> 12% Growth for 24 months
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                  <p className="text-[13px] text-gray-500 mb-1">Amount Invested</p>
-                  <p className="text-[20px] font-semibold text-gray-900">$10,000</p>
-                </div>
-                <div>
-                  <p className="text-[13px] text-gray-500 mb-1">Maturity Date</p>
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4 text-gray-500" />
-                    <p className="text-[15px] text-gray-900">Jan 15, 2026</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <div className="flex justify-between text-[13px] mb-2">
-                  <span className="text-gray-600">Maturity Progress</span>
-                  <span className="text-gray-600">{saplingStashSimulation.currentProgress}% Complete</span>
-                </div>
-                <div className="relative">
-                  <div className="h-[4px] w-full bg-gray-200 rounded-full">
-                    <div 
-                      className="absolute top-0 left-0 h-[4px] bg-[#1B4242] rounded-full" 
-                      style={{ width: `${saplingStashSimulation.currentProgress}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <div className="flex justify-between text-[13px] mb-2">
-                  <span className="text-gray-600">Current: {saplingStashSimulation.currentProgress}%</span>
-                  <span className="text-gray-600">Simulated: {saplingStashSimulation.simulatedProgress}%</span>
-                </div>
-                <div className="relative h-4 flex items-center">
-                  <div 
-                    className="absolute top-[6px] left-0 h-1 bg-[#1B4242] rounded-full" 
-                    style={{ width: `${saplingStashSimulation.currentProgress}%` }}
-                  />
-                  <Slider
-                    defaultValue={[saplingStashSimulation.currentProgress]}
-                    max={100}
-                    step={1}
-                    className="absolute w-full"
-                    onValueChange={(value) => {
-                      const simulatedValue = value[0]
-                      const projectedProfit = calculateProjectedProfit(
-                        saplingStashSimulation.investedAmount,
-                        saplingStashSimulation.growthRate,
-                        simulatedValue
-                      )
-                      setSaplingStashSimulation(prev => ({
-                        ...prev,
-                        simulatedProgress: simulatedValue,
-                        projectedProfit: Number(projectedProfit)
-                      }))
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-[13px] text-gray-500 mb-1">Current Profit</p>
-                  <p className="text-[15px] text-[#039855] font-medium">
-                    +${saplingStashSimulation.currentProfit.toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[13px] text-gray-500 mb-1">Projected Profit</p>
-                  <p className="text-[15px] text-[#039855] font-medium">
-                    +${saplingStashSimulation.projectedProfit.toFixed(2)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Blossom Budget Jar */}
-          <Card className="bg-white rounded-[20px] shadow-sm overflow-hidden mt-4">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 relative">
-                    <Image 
-                      src="/assets/icons/blossom-jar.svg" 
-                      alt="Blossom Budget" 
-                      width={20} 
-                      height={20}
-                    />
-                  </div>
-                  <span className="text-[16px] font-medium text-gray-900">Blossom Budget</span>
-                </div>
-                <div className="bg-[#ECFDF3] px-2.5 py-1 rounded-full">
-                  <p className="text-[13px] text-[#039855] font-medium flex items-center gap-1">
-                    <span className="text-lg">↗</span> 15% Growth for 36 months
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                  <p className="text-[13px] text-gray-500 mb-1">Amount Invested</p>
-                  <p className="text-[20px] font-semibold text-gray-900">$3,000</p>
-                </div>
-                <div>
-                  <p className="text-[13px] text-gray-500 mb-1">Maturity Date</p>
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4 text-gray-500" />
-                    <p className="text-[15px] text-gray-900">Feb 15, 2027</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <div className="flex justify-between text-[13px] mb-2">
-                  <span className="text-gray-600">Maturity Progress</span>
-                  <span className="text-gray-600">{blossomBudgetSimulation.currentProgress}% Complete</span>
-                </div>
-                <div className="relative">
-                  <div className="h-[4px] w-full bg-gray-200 rounded-full">
-                    <div 
-                      className="absolute top-0 left-0 h-[4px] bg-[#1B4242] rounded-full" 
-                      style={{ width: `${blossomBudgetSimulation.currentProgress}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <div className="flex justify-between text-[13px] mb-2">
-                  <span className="text-gray-600">Current: {blossomBudgetSimulation.currentProgress}%</span>
-                  <span className="text-gray-600">Simulated: {blossomBudgetSimulation.simulatedProgress}%</span>
-                </div>
-                <div className="relative h-4 flex items-center">
-                  <div 
-                    className="absolute top-[6px] left-0 h-1 bg-[#1B4242] rounded-full" 
-                    style={{ width: `${blossomBudgetSimulation.currentProgress}%` }}
-                  />
-                  <Slider
-                    defaultValue={[blossomBudgetSimulation.currentProgress]}
-                    max={100}
-                    step={1}
-                    className="absolute w-full"
-                    onValueChange={(value) => {
-                      const simulatedValue = value[0]
-                      const projectedProfit = calculateProjectedProfit(
-                        blossomBudgetSimulation.investedAmount,
-                        blossomBudgetSimulation.growthRate,
-                        simulatedValue
-                      )
-                      setBlossomBudgetSimulation(prev => ({
-                        ...prev,
-                        simulatedProgress: simulatedValue,
-                        projectedProfit: Number(projectedProfit)
-                      }))
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-[13px] text-gray-500 mb-1">Current Profit</p>
-                  <p className="text-[15px] text-[#039855] font-medium">
-                    +${blossomBudgetSimulation.currentProfit.toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[13px] text-gray-500 mb-1">Projected Profit</p>
-                  <p className="text-[15px] text-[#039855] font-medium">
-                    +${blossomBudgetSimulation.projectedProfit.toFixed(2)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            )
+          })}
         </div>
 
         {/* Quick Actions */}
@@ -514,7 +363,7 @@ export default function MobileDashboard() {
               <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mb-2">
                 <Plus className="h-6 w-6 text-green-600" />
               </div>
-              <span className="text-xs text-gray-600">Create Jar</span>
+              <span className="text-xs text-gray-600">Invest</span>
             </Link>
             <Link href="/mobile/withdraw" className="flex flex-col items-center">
               <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center mb-2">

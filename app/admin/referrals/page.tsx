@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Search,
   Filter,
@@ -63,176 +63,8 @@ import {
   Pie,
   Cell,
 } from "recharts"
-
-// Mock data for referrals
-const referrals = [
-  {
-    id: "REF-001",
-    referrerId: "CUST-001",
-    referrerName: "John Smith",
-    referredId: "CUST-008",
-    referredName: "Lisa Martinez",
-    date: "2023-12-15",
-    status: "completed",
-    reward: 50,
-    tier: "Grower",
-  },
-  {
-    id: "REF-002",
-    referrerId: "CUST-002",
-    referrerName: "Sarah Johnson",
-    referredId: "CUST-009",
-    referredName: "Thomas Wilson",
-    date: "2023-12-20",
-    status: "pending",
-    reward: 50,
-    tier: "Harvester",
-  },
-  {
-    id: "REF-003",
-    referrerId: "CUST-004",
-    referrerName: "Emily Davis",
-    referredId: "CUST-010",
-    referredName: "Jessica Brown",
-    date: "2024-01-05",
-    status: "completed",
-    reward: 75,
-    tier: "Harvester",
-  },
-  {
-    id: "REF-004",
-    referrerId: "CUST-007",
-    referrerName: "David Brown",
-    referredId: "CUST-011",
-    referredName: "Kevin Lee",
-    date: "2024-01-10",
-    status: "pending",
-    reward: 50,
-    tier: "Grower",
-  },
-  {
-    id: "REF-005",
-    referrerId: "CUST-001",
-    referrerName: "John Smith",
-    referredId: "CUST-012",
-    referredName: "Amanda Garcia",
-    date: "2024-01-15",
-    status: "completed",
-    reward: 50,
-    tier: "Grower",
-  },
-  {
-    id: "REF-006",
-    referrerId: "CUST-002",
-    referrerName: "Sarah Johnson",
-    referredId: "CUST-013",
-    referredName: "Michael Rodriguez",
-    date: "2024-01-18",
-    status: "flagged",
-    reward: 75,
-    tier: "Harvester",
-    flagReason: "Suspicious pattern - multiple referrals from same IP",
-  },
-  {
-    id: "REF-007",
-    referrerId: "CUST-005",
-    referrerName: "Robert Wilson",
-    referredId: "CUST-014",
-    referredName: "Jennifer Taylor",
-    date: "2024-01-20",
-    status: "pending",
-    reward: 50,
-    tier: "Grower",
-  },
-  {
-    id: "REF-008",
-    referrerId: "CUST-008",
-    referrerName: "Lisa Martinez",
-    referredId: "CUST-015",
-    referredName: "Daniel Clark",
-    date: "2024-01-25",
-    status: "completed",
-    reward: 100,
-    tier: "Legend",
-  },
-]
-
-// Mock data for referral performance
-const referralPerformanceData = [
-  { month: "Jan", referrals: 25, conversion: 18 },
-  { month: "Feb", referrals: 30, conversion: 22 },
-  { month: "Mar", referrals: 35, conversion: 28 },
-  { month: "Apr", referrals: 40, conversion: 30 },
-  { month: "May", referrals: 45, conversion: 35 },
-  { month: "Jun", referrals: 55, conversion: 42 },
-  { month: "Jul", referrals: 65, conversion: 50 },
-  { month: "Aug", referrals: 75, conversion: 58 },
-  { month: "Sep", referrals: 85, conversion: 65 },
-  { month: "Oct", referrals: 95, conversion: 72 },
-  { month: "Nov", referrals: 110, conversion: 85 },
-  { month: "Dec", referrals: 130, conversion: 100 },
-]
-
-// Mock data for top referrers
-const topReferrers = [
-  { id: "CUST-001", name: "John Smith", referrals: 115, completed: 102, reward: 10200, tier: "Legend" },
-  { id: "CUST-002", name: "Sarah Johnson", referrals: 72, completed: 65, reward: 4875, tier: "Harvester" },
-  { id: "CUST-004", name: "Emily Davis", referrals: 48, completed: 42, reward: 3150, tier: "Harvester" },
-  { id: "CUST-007", name: "David Brown", referrals: 23, completed: 19, reward: 950, tier: "Grower" },
-  { id: "CUST-005", name: "Robert Wilson", referrals: 18, completed: 15, reward: 750, tier: "Grower" },
-]
-
-// Mock data for referral campaigns
-const referralCampaigns = [
-  {
-    id: "CAMP-001",
-    name: "Standard Referral Program",
-    status: "active",
-    startDate: "2023-01-01",
-    endDate: null,
-    referrerReward: 50,
-    description: "Our standard ongoing referral program",
-    conditions: "Referred user must create an account",
-    totalReferrals: 487,
-    conversionRate: 68,
-  },
-  {
-    id: "CAMP-002",
-    name: "Spring Promotion",
-    status: "active",
-    startDate: "2024-03-01",
-    endDate: "2024-05-31",
-    referrerReward: 75,
-    description: "Limited time increased rewards for spring season",
-    conditions: "Referred user must create an account within 14 days",
-    totalReferrals: 124,
-    conversionRate: 72,
-  },
-  {
-    id: "CAMP-003",
-    name: "New Year Kickoff",
-    status: "ended",
-    startDate: "2024-01-01",
-    endDate: "2024-02-29",
-    referrerReward: 100,
-    description: "New Year promotion with increased referrer rewards",
-    conditions: "Referred user must create an account",
-    totalReferrals: 203,
-    conversionRate: 65,
-  },
-  {
-    id: "CAMP-004",
-    name: "Legend Member Bonus",
-    status: "active",
-    startDate: "2023-06-01",
-    endDate: null,
-    referrerReward: 100,
-    description: "Increased rewards for Legend tier members only",
-    conditions: "Only available to Legend tier members. Referred user must create an account",
-    totalReferrals: 89,
-    conversionRate: 78,
-  },
-]
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { useToast } from "@/components/ui/use-toast"
 
 // Referral tiers
 const referralTiers = [
@@ -259,6 +91,25 @@ export default function ReferralsPage() {
   const [activeMainTab, setActiveMainTab] = useState("overview")
   const [editingCampaign, setEditingCampaign] = useState<any>(null)
   const [showNewCampaignDialog, setShowNewCampaignDialog] = useState(false)
+  const [referrals, setReferrals] = useState<any[]>([])
+  const [referralCampaigns, setReferralCampaigns] = useState<any[]>([])
+  const [topReferrers, setTopReferrers] = useState<any[]>([])
+  const [referralPerformanceData, setReferralPerformanceData] = useState<any[]>([])
+  const [referralTiers, setReferralTiers] = useState<any[]>([])
+  const [originalTiers, setOriginalTiers] = useState<any[]>([])
+  const [showTierDialog, setShowTierDialog] = useState(false)
+  const [editingTier, setEditingTier] = useState<any | null>(null)
+  const [leaderboardEnabled, setLeaderboardEnabled] = useState(true)
+  const [defaultNicknameFormat, setDefaultNicknameFormat] = useState("GreenOak###")
+  const [leaderboardVisibility, setLeaderboardVisibility] = useState(true)
+  const [isContest, setIsContest] = useState(false)
+  const [prize1, setPrize1] = useState("")
+  const [prize2, setPrize2] = useState("")
+  const [prize3, setPrize3] = useState("")
+  const [viewCampaign, setViewCampaign] = useState<any>(null)
+  const [editCampaign, setEditCampaign] = useState<any>(null)
+  const [newCampaignStatus, setNewCampaignStatus] = useState("draft")
+  const { toast } = useToast()
 
   const filteredReferrals = referrals
     .filter(
@@ -302,6 +153,136 @@ export default function ReferralsPage() {
     { name: "Harvester", value: referrals.filter((ref) => ref.tier === "Harvester").length },
     { name: "Legend", value: referrals.filter((ref) => ref.tier === "Legend").length },
   ]
+
+  // Fetch tiers from Supabase on load
+  useEffect(() => {
+    async function fetchTiers() {
+      const supabase = createClientComponentClient()
+      const { data, error } = await supabase
+        .from("referral_tiers")
+        .select("*")
+        .order("min_referrals", { ascending: true })
+      if (!error) {
+        setReferralTiers(data || [])
+        setOriginalTiers(data || [])
+      }
+    }
+    fetchTiers()
+  }, [])
+
+  // Fetch leaderboard settings from Supabase on mount
+  useEffect(() => {
+    async function fetchLeaderboardSettings() {
+      const supabase = createClientComponentClient()
+      const { data, error } = await supabase
+        .from("referral_settings")
+        .select("leaderboard_enabled, default_nickname_format, leaderboard_visibility")
+        .single()
+      if (data) {
+        setLeaderboardEnabled(data.leaderboard_enabled ?? true)
+        setDefaultNicknameFormat(data.default_nickname_format || "GreenOak###")
+        setLeaderboardVisibility(data.leaderboard_visibility ?? true)
+      }
+    }
+    fetchLeaderboardSettings()
+  }, [])
+
+  // Add/Edit Tier dialog handlers
+  function handleAddTier() {
+    setEditingTier({ name: "", min_referrals: 0, max_referrals: null, reward_amount: 0, color: "bg-emerald-500" })
+    setShowTierDialog(true)
+  }
+  function handleEditTier(tier: any) {
+    setEditingTier({ ...tier })
+    setShowTierDialog(true)
+  }
+  function handleDeleteTier(id: string) {
+    setReferralTiers((tiers) => tiers.filter((t) => t.id !== id))
+  }
+  function handleDialogSave() {
+    if (!editingTier.name) return
+    if (editingTier.id) {
+      setReferralTiers((tiers) => tiers.map((t) => t.id === editingTier.id ? editingTier : t))
+    } else {
+      setReferralTiers((tiers) => [...tiers, { ...editingTier, id: crypto.randomUUID() }])
+    }
+    setShowTierDialog(false)
+    setEditingTier(null)
+  }
+  function handleDialogCancel() {
+    setShowTierDialog(false)
+    setEditingTier(null)
+  }
+  // Save all tiers to Supabase
+  async function handleSaveSettings() {
+    const supabase = createClientComponentClient()
+    // Upsert all tiers
+    for (const tier of referralTiers) {
+      await supabase.from("referral_tiers").upsert({ ...tier, updated_at: new Date().toISOString() }, { onConflict: "id" })
+    }
+    // Delete removed tiers
+    const removed = originalTiers.filter((t) => !referralTiers.find((r) => r.id === t.id))
+    for (const tier of removed) {
+      await supabase.from("referral_tiers").delete().eq("id", tier.id)
+    }
+    setOriginalTiers([...referralTiers])
+    toast({ title: "Referral tiers saved" })
+    toast({ title: "Referral settings saved successfully." })
+  }
+  // Cancel changes
+  function handleCancelSettings() {
+    setReferralTiers([...originalTiers])
+    toast({ title: "Changes reverted" })
+  }
+
+  // Save leaderboard settings
+  async function handleSaveLeaderboardSettings() {
+    const supabase = createClientComponentClient()
+    await supabase.from("referral_settings").upsert({
+      id: 1,
+      leaderboard_enabled: leaderboardEnabled,
+      default_nickname_format: defaultNicknameFormat,
+      leaderboard_visibility: leaderboardVisibility,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "id" })
+    toast({ title: "Leaderboard settings saved successfully." })
+  }
+
+  useEffect(() => {
+    const supabase = createClientComponentClient()
+    // Fetch all referrals
+    async function fetchReferrals() {
+      const { data, error } = await supabase
+        .from("referrals")
+        .select(`*, referrer:referrer_id (id, first_name, last_name), referred:referred_id (id, first_name, last_name), campaign:campaign_id (id, name, reward_amount)`)
+        .order("created_at", { ascending: false })
+      if (!error) setReferrals(data || [])
+    }
+    // Fetch all campaigns
+    async function fetchCampaigns() {
+      const { data, error } = await supabase
+        .from("referral_campaigns")
+        .select("*")
+        .order("created_at", { ascending: false })
+      if (!error) setReferralCampaigns(data || [])
+    }
+    // Fetch top referrers (aggregate)
+    async function fetchTopReferrers() {
+      const { data, error } = await supabase.rpc("get_top_referrers")
+      if (!error) setTopReferrers(data || [])
+    }
+    // Fetch referral performance (aggregate by month)
+    async function fetchPerformance() {
+      const { data, error } = await supabase.rpc("get_referral_performance_by_month")
+      if (!error) setReferralPerformanceData(data || [])
+    }
+    // Fetch referral tiers (if in DB, else keep static)
+    // ...
+    fetchReferrals()
+    fetchCampaigns()
+    fetchTopReferrers()
+    fetchPerformance()
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -589,10 +570,41 @@ export default function ReferralsPage() {
                     <Textarea id="conditions" placeholder="Conditions for reward eligibility" className="col-span-3" />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="is-contest" className="text-right">
+                      Contest Campaign
+                    </Label>
+                    <div className="col-span-3 flex items-center gap-2">
+                      <Switch id="is-contest" checked={isContest} onCheckedChange={setIsContest} />
+                      <span className="text-sm text-muted-foreground">Enable contest and prizes</span>
+                    </div>
+                  </div>
+                  {isContest && (
+                    <>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="prize1" className="text-right">
+                          1st Place Prize
+                        </Label>
+                        <Input id="prize1" placeholder="$500" className="col-span-3" value={prize1} onChange={e => setPrize1(e.target.value)} />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="prize2" className="text-right">
+                          2nd Place Prize
+                        </Label>
+                        <Input id="prize2" placeholder="$250" className="col-span-3" value={prize2} onChange={e => setPrize2(e.target.value)} />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="prize3" className="text-right">
+                          3rd Place Prize
+                        </Label>
+                        <Input id="prize3" placeholder="$100" className="col-span-3" value={prize3} onChange={e => setPrize3(e.target.value)} />
+                      </div>
+                    </>
+                  )}
+                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="campaign-status" className="text-right">
                       Status
                     </Label>
-                    <Select defaultValue="draft">
+                    <Select value={newCampaignStatus} onValueChange={setNewCampaignStatus}>
                       <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
@@ -608,7 +620,63 @@ export default function ReferralsPage() {
                   <Button variant="outline" onClick={() => setShowNewCampaignDialog(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={() => setShowNewCampaignDialog(false)}>Create Campaign</Button>
+                  <Button
+                    onClick={async () => {
+                      // Gather form values
+                      const name = (document.getElementById("campaign-name") as HTMLInputElement)?.value || ""
+                      const description = (document.getElementById("campaign-description") as HTMLTextAreaElement)?.value || ""
+                      const startDate = (document.getElementById("start-date") as HTMLInputElement)?.value || null
+                      const endDate = (document.getElementById("end-date") as HTMLInputElement)?.value || null
+                      const referrerReward = (document.getElementById("referrer-reward") as HTMLInputElement)?.value || ""
+                      const rewardType = (document.getElementById("reward-type") as HTMLInputElement)?.value || "cash"
+                      const conditions = (document.getElementById("conditions") as HTMLTextAreaElement)?.value || ""
+                      // Use state for isContest, prize1, prize2, prize3, newCampaignStatus
+                      const payload = {
+                        name,
+                        description,
+                        reward_amount: Number(referrerReward),
+                        reward_type: rewardType,
+                        start_date: startDate,
+                        end_date: endDate,
+                        is_contest: isContest,
+                        prize_1st: prize1 ? Number(prize1) : null,
+                        prize_2nd: prize2 ? Number(prize2) : null,
+                        prize_3rd: prize3 ? Number(prize3) : null,
+                        status: newCampaignStatus,
+                        conditions,
+                      }
+                      console.log("Insert payload:", payload)
+                      // Validate required fields
+                      if (!name || !referrerReward || !status || !startDate) {
+                        toast({ title: "Missing required fields", description: "Name, reward, start date, and status are required.", variant: "destructive" })
+                        return
+                      }
+                      if (isNaN(Number(referrerReward))) {
+                        toast({ title: "Invalid reward amount", description: "Reward must be a number.", variant: "destructive" })
+                        return
+                      }
+                      // Insert
+                      const supabase = createClientComponentClient()
+                      const { error } = await supabase.from("referral_campaigns").insert([payload])
+                      if (!error) {
+                        setShowNewCampaignDialog(false)
+                        setIsContest(false)
+                        setPrize1("")
+                        setPrize2("")
+                        setPrize3("")
+                        setNewCampaignStatus("draft")
+                        toast({ title: "Campaign created" })
+                        // Refresh campaigns
+                        const { data } = await supabase.from("referral_campaigns").select("*").order("created_at", { ascending: false })
+                        setReferralCampaigns(data || [])
+                      } else {
+                        console.error("Supabase insert error:", error);
+                        toast({ title: "Error", description: JSON.stringify(error, null, 2), variant: "destructive" })
+                      }
+                    }}
+                  >
+                    Create Campaign
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -658,14 +726,37 @@ export default function ReferralsPage() {
                     <p className="text-xs text-muted-foreground">Conditions</p>
                     <p className="text-sm">{campaign.conditions}</p>
                   </div>
+
+                  {campaign.is_contest && (
+                    <div className="rounded-lg border p-3 bg-gradient-to-r from-amber-50 to-yellow-50">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Gift className="h-5 w-5 text-amber-500" />
+                        <span className="font-medium text-amber-700">Contest Campaign</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <span className="block text-xs text-muted-foreground">1st Place</span>
+                          <span className="font-bold text-lg text-yellow-600">{campaign.prize1 || "$—"}</span>
+                        </div>
+                        <div>
+                          <span className="block text-xs text-muted-foreground">2nd Place</span>
+                          <span className="font-bold text-lg text-gray-500">{campaign.prize2 || "$—"}</span>
+                        </div>
+                        <div>
+                          <span className="block text-xs text-muted-foreground">3rd Place</span>
+                          <span className="font-bold text-lg text-amber-600">{campaign.prize3 || "$—"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
                 <CardFooter className="flex justify-between border-t bg-muted/50 px-4 py-3">
                   <p className="text-sm">{campaign.totalReferrals} referrals</p>
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => setViewCampaign(campaign)}>
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => setEditCampaign(campaign)}>
                       <Edit className="h-4 w-4" />
                     </Button>
                     <DropdownMenu>
@@ -1129,8 +1220,11 @@ export default function ReferralsPage() {
                               <TableCell>{tier.max === Number.POSITIVE_INFINITY ? "∞" : tier.max}</TableCell>
                               <TableCell>${tier.reward}</TableCell>
                               <TableCell>
-                                <Button variant="ghost" size="sm">
+                                <Button variant="ghost" size="sm" onClick={() => handleEditTier(tier)}>
                                   <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleDeleteTier(tier.id)}>
+                                  <XCircle className="h-4 w-4 text-destructive" />
                                 </Button>
                               </TableCell>
                             </TableRow>
@@ -1138,7 +1232,7 @@ export default function ReferralsPage() {
                         </TableBody>
                       </Table>
                     </div>
-                    <Button variant="outline" size="sm" className="mt-2">
+                    <Button variant="outline" size="sm" className="mt-2" onClick={handleAddTier}>
                       <Plus className="mr-2 h-4 w-4" /> Add Tier
                     </Button>
                   </div>
@@ -1266,14 +1360,227 @@ export default function ReferralsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Leaderboard Settings */}
+              <div className="space-y-6 border rounded-lg p-4 mb-6">
+                <h3 className="text-lg font-medium mb-2">Leaderboard Settings</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <Label htmlFor="leaderboard-enabled">Enable Leaderboard</Label>
+                  <Switch id="leaderboard-enabled" checked={leaderboardEnabled} onCheckedChange={setLeaderboardEnabled} />
+                </div>
+                <div className="flex items-center justify-between mb-4">
+                  <Label htmlFor="leaderboard-visibility">Show Nicknames on Leaderboard</Label>
+                  <Switch id="leaderboard-visibility" checked={leaderboardVisibility} onCheckedChange={setLeaderboardVisibility} />
+                </div>
+                <div className="mb-4">
+                  <Label htmlFor="default-nickname-format">Default Nickname Format</Label>
+                  <Input id="default-nickname-format" value={defaultNicknameFormat} onChange={e => setDefaultNicknameFormat(e.target.value)} />
+                  <p className="text-xs text-muted-foreground">Use ### for random digits, e.g., GreenOak###</p>
+                </div>
+                <Button variant="outline" onClick={handleSaveLeaderboardSettings}>Save Leaderboard Settings</Button>
+              </div>
             </CardContent>
             <CardFooter className="flex justify-end gap-2 border-t p-4">
-              <Button variant="outline">Cancel Changes</Button>
-              <Button>Save Settings</Button>
+              <Button variant="outline" onClick={handleCancelSettings}>Cancel Changes</Button>
+              <Button onClick={handleSaveSettings}>Save Settings</Button>
             </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
+      <Dialog open={showTierDialog} onOpenChange={setShowTierDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>{editingTier?.id ? "Edit Tier" : "Add Tier"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Name</Label>
+              <Input value={editingTier?.name || ""} onChange={e => setEditingTier({ ...editingTier, name: e.target.value })} />
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Label>Min Referrals</Label>
+                <Input type="number" value={editingTier?.min_referrals || 0} onChange={e => setEditingTier({ ...editingTier, min_referrals: Number(e.target.value) })} />
+              </div>
+              <div className="flex-1">
+                <Label>Max Referrals</Label>
+                <Input type="number" value={editingTier?.max_referrals ?? ""} onChange={e => setEditingTier({ ...editingTier, max_referrals: e.target.value === "" ? null : Number(e.target.value) })} />
+              </div>
+            </div>
+            <div>
+              <Label>Reward Amount ($)</Label>
+              <Input type="number" value={editingTier?.reward_amount || 0} onChange={e => setEditingTier({ ...editingTier, reward_amount: Number(e.target.value) })} />
+            </div>
+            <div>
+              <Label>Color</Label>
+              <Select value={editingTier?.color || "bg-emerald-500"} onValueChange={color => setEditingTier({ ...editingTier, color })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bg-emerald-500">Green</SelectItem>
+                  <SelectItem value="bg-amber-500">Amber</SelectItem>
+                  <SelectItem value="bg-purple-500">Purple</SelectItem>
+                  <SelectItem value="bg-blue-500">Blue</SelectItem>
+                  <SelectItem value="bg-pink-500">Pink</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleDialogCancel}>Cancel</Button>
+            <Button onClick={handleDialogSave}>{editingTier?.id ? "Save" : "Add"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {viewCampaign && (
+        <Dialog open={!!viewCampaign} onOpenChange={() => setViewCampaign(null)}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>View Campaign</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2">
+              <div><b>Name:</b> {viewCampaign.name}</div>
+              <div><b>Description:</b> {viewCampaign.description}</div>
+              <div><b>Status:</b> {viewCampaign.status}</div>
+              <div><b>Start Date:</b> {viewCampaign.start_date ? new Date(viewCampaign.start_date).toLocaleDateString() : "-"}</div>
+              <div><b>End Date:</b> {viewCampaign.end_date ? new Date(viewCampaign.end_date).toLocaleDateString() : "-"}</div>
+              <div><b>Reward Amount:</b> ${viewCampaign.reward_amount}</div>
+              <div><b>Reward Type:</b> {viewCampaign.reward_type}</div>
+              <div><b>Conditions:</b> {viewCampaign.conditions}</div>
+              <div><b>Contest:</b> {viewCampaign.is_contest ? "Yes" : "No"}</div>
+              {viewCampaign.is_contest && (
+                <>
+                  <div><b>1st Prize:</b> {viewCampaign.prize_1st}</div>
+                  <div><b>2nd Prize:</b> {viewCampaign.prize_2nd}</div>
+                  <div><b>3rd Prize:</b> {viewCampaign.prize_3rd}</div>
+                </>
+              )}
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setViewCampaign(null)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+      {editCampaign && (
+        <Dialog open={!!editCampaign} onOpenChange={() => setEditCampaign(null)}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Edit Campaign</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-campaign-name" className="text-right">Name</Label>
+                <Input id="edit-campaign-name" defaultValue={editCampaign.name} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-campaign-description" className="text-right">Description</Label>
+                <Textarea id="edit-campaign-description" defaultValue={editCampaign.description} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-start-date" className="text-right">Start Date</Label>
+                <Input id="edit-start-date" type="date" defaultValue={editCampaign.start_date ? editCampaign.start_date.split('T')[0] : ""} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-end-date" className="text-right">End Date</Label>
+                <Input id="edit-end-date" type="date" defaultValue={editCampaign.end_date ? editCampaign.end_date.split('T')[0] : ""} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-reward-amount" className="text-right">Reward Amount ($)</Label>
+                <Input id="edit-reward-amount" type="number" defaultValue={editCampaign.reward_amount} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-reward-type" className="text-right">Reward Type</Label>
+                <Input id="edit-reward-type" defaultValue={editCampaign.reward_type || "cash"} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-conditions" className="text-right">Conditions</Label>
+                <Textarea id="edit-conditions" defaultValue={editCampaign.conditions} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-status" className="text-right">Status</Label>
+                <Select value={editCampaign.status || "draft"} onValueChange={val => setEditCampaign((c: any) => ({ ...c, status: val }))}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="scheduled">Scheduled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-is-contest" className="text-right">Contest Campaign</Label>
+                <div className="col-span-3 flex items-center gap-2">
+                  <Switch id="edit-is-contest" defaultChecked={!!editCampaign.is_contest} />
+                  <span className="text-sm text-muted-foreground">Enable contest and prizes</span>
+                </div>
+              </div>
+              {editCampaign.is_contest && (
+                <>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="edit-prize-1st" className="text-right">1st Place Prize</Label>
+                    <Input id="edit-prize-1st" defaultValue={editCampaign.prize_1st} className="col-span-3" />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="edit-prize-2nd" className="text-right">2nd Place Prize</Label>
+                    <Input id="edit-prize-2nd" defaultValue={editCampaign.prize_2nd} className="col-span-3" />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="edit-prize-3rd" className="text-right">3rd Place Prize</Label>
+                    <Input id="edit-prize-3rd" defaultValue={editCampaign.prize_3rd} className="col-span-3" />
+                  </div>
+                </>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditCampaign(null)}>Cancel</Button>
+              <Button
+                onClick={async () => {
+                  const name = (document.getElementById("edit-campaign-name") as HTMLInputElement)?.value || ""
+                  const description = (document.getElementById("edit-campaign-description") as HTMLTextAreaElement)?.value || ""
+                  const startDate = (document.getElementById("edit-start-date") as HTMLInputElement)?.value || null
+                  const endDate = (document.getElementById("edit-end-date") as HTMLInputElement)?.value || null
+                  const rewardAmount = (document.getElementById("edit-reward-amount") as HTMLInputElement)?.value || ""
+                  const rewardType = (document.getElementById("edit-reward-type") as HTMLInputElement)?.value || "cash"
+                  const conditions = (document.getElementById("edit-conditions") as HTMLTextAreaElement)?.value || ""
+                  const status = document.querySelector('#edit-status [data-state="open"] [data-value]')?.getAttribute('data-value') || editCampaign.status || "draft"
+                  const isContest = (document.getElementById("edit-is-contest") as HTMLInputElement)?.checked || false
+                  const prize1 = (document.getElementById("edit-prize-1st") as HTMLInputElement)?.value || null
+                  const prize2 = (document.getElementById("edit-prize-2nd") as HTMLInputElement)?.value || null
+                  const prize3 = (document.getElementById("edit-prize-3rd") as HTMLInputElement)?.value || null
+                  const supabase = createClientComponentClient()
+                  const { error } = await supabase.from("referral_campaigns").update({
+                    name,
+                    description,
+                    start_date: startDate ? new Date(startDate).toISOString() : null,
+                    end_date: endDate ? new Date(endDate).toISOString() : null,
+                    reward_amount: rewardAmount,
+                    reward_type: rewardType,
+                    conditions,
+                    status,
+                    is_contest: isContest,
+                    prize_1st: isContest ? prize1 : null,
+                    prize_2nd: isContest ? prize2 : null,
+                    prize_3rd: isContest ? prize3 : null,
+                  }).eq('id', editCampaign.id)
+                  if (!error) {
+                    setEditCampaign(null)
+                    toast({ title: "Campaign updated" })
+                    // Refresh campaigns
+                    const { data } = await supabase.from("referral_campaigns").select("*").order("created_at", { ascending: false })
+                    setReferralCampaigns(data || [])
+                  } else {
+                    toast({ title: "Error", description: error.message, variant: "destructive" })
+                  }
+                }}
+              >
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

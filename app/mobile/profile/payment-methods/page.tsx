@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { ArrowLeft, Plus, CreditCard, BanknoteIcon as Bank, Trash2, CheckCircle, Edit } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -23,77 +23,79 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function PaymentMethodsPage() {
-  const [paymentMethods, setPaymentMethods] = useState([
-    {
-      id: "card-1",
-      type: "card",
-      name: "Visa ending in 4242",
-      details: "Expires 04/25",
-      isDefault: true,
-    },
-    {
-      id: "bank-1",
-      type: "bank",
-      name: "Chase Bank Account",
-      details: "Account ending in 1234",
-      isDefault: false,
-    },
-  ])
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([])
   const [addDialogOpen, setAddDialogOpen] = useState(false)
-  const [newPaymentType, setNewPaymentType] = useState("card")
+  const [newPaymentType, setNewPaymentType] = useState("bank")
+  const [form, setForm] = useState({
+    account_holder_name: "",
+    bank_name: "",
+    routing_number: "",
+    account_number: "",
+    account_type: "checking",
+  })
   const { toast } = useToast()
 
-  const handleAddPaymentMethod = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    // In a real app, this would be an API call to add the payment method
-    const newMethod = {
-      id: `${newPaymentType}-${Date.now()}`,
-      type: newPaymentType,
-      name: newPaymentType === "card" ? "Mastercard ending in 5678" : "Bank of America Account",
-      details: newPaymentType === "card" ? "Expires 12/26" : "Account ending in 5678",
-      isDefault: false,
+  // Fetch bank accounts from Supabase
+  useEffect(() => {
+    async function fetchBankAccounts() {
+      const supabase = createClientComponentClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+      const { data, error } = await supabase
+        .from("customer_bank_accounts")
+        .select("id, bank_name, account_number, routing_number, account_holder_name, created_at")
+        .eq("customer_id", session.user.id)
+        .order("created_at", { ascending: false })
+      if (!error) setPaymentMethods(data || [])
     }
+    fetchBankAccounts()
+  }, [])
 
-    setPaymentMethods((prev) => [...prev, newMethod])
-    setAddDialogOpen(false)
-
-    toast({
-      title: "Payment method added",
-      description: "Your new payment method has been added successfully.",
-    })
+  // Add new bank account
+  const handleAddPaymentMethod = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const supabase = createClientComponentClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return
+    const { error } = await supabase
+      .from("customer_bank_accounts")
+      .insert({
+        customer_id: session.user.id,
+        bank_name: form.bank_name,
+        account_number: form.account_number,
+        routing_number: form.routing_number,
+        account_holder_name: form.account_holder_name,
+      })
+    if (!error) {
+      toast({ title: "Bank account added", description: "Your new bank account has been added successfully." })
+      setAddDialogOpen(false)
+      setForm({ account_holder_name: "", bank_name: "", routing_number: "", account_number: "", account_type: "checking" })
+      // Refresh list
+      const { data } = await supabase
+        .from("customer_bank_accounts")
+        .select("id, bank_name, account_number, routing_number, account_holder_name, created_at")
+        .eq("customer_id", session.user.id)
+        .order("created_at", { ascending: false })
+      setPaymentMethods(data || [])
+    }
   }
 
-  const handleSetDefault = (id: string) => {
-    setPaymentMethods((prev) =>
-      prev.map((method) => ({
-        ...method,
-        isDefault: method.id === id,
-      })),
-    )
-
-    toast({
-      title: "Default payment method updated",
-      description: "Your default payment method has been updated.",
-    })
-  }
-
-  const handleRemove = (id: string) => {
+  // Remove bank account
+  const handleRemove = async (id: string) => {
+    const supabase = createClientComponentClient()
+    await supabase.from("customer_bank_accounts").delete().eq("id", id)
     setPaymentMethods((prev) => prev.filter((method) => method.id !== id))
-
-    toast({
-      title: "Payment method removed",
-      description: "Your payment method has been removed successfully.",
-    })
+    toast({ title: "Bank account removed", description: "Your bank account has been removed successfully." })
   }
 
   return (
     <div className="container space-y-6 px-4 py-6">
       <div className="flex items-center">
         <Button variant="ghost" size="icon" className="mr-2" asChild>
-          <Link href="/profile">
+          <Link href="/mobile/profile">
             <ArrowLeft className="h-5 w-5" />
             <span className="sr-only">Back</span>
           </Link>
@@ -255,13 +257,10 @@ export default function PaymentMethodsPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       {!method.isDefault && (
-                        <DropdownMenuItem onClick={() => handleSetDefault(method.id)}>
-                          <CheckCircle className="mr-2 h-4 w-4" /> Set as default
+                        <DropdownMenuItem onClick={() => handleRemove(method.id)}>
+                          <Trash2 className="mr-2 h-4 w-4" /> Remove
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem onClick={() => handleRemove(method.id)}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Remove
-                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
