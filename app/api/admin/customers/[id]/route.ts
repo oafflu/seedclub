@@ -4,77 +4,54 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const id = params.id;
   try {
-    // Try to fetch by id first, then by code if not found
-    let { data: customer, error } = await supabaseAdmin
+    // Fetch customer
+    const { data: customer, error: customerError } = await supabaseAdmin
       .from("customers")
-      .select(`
-        *,
-        customer_profiles (*),
-        kyc_verifications (status),
-        customer_jars (
-          id,
-          initial_amount,
-          current_value
-        )
-      `)
+      .select("id, email, first_name, last_name, is_active")
       .eq("id", id)
       .single();
-
-    // Now safe to log params.id
-    // console.log("API param id:", params.id, "length:", params.id.length);
-
-    if ((!customer || error) && id.startsWith('CUST-')) {
-      ({ data: customer, error } = await supabaseAdmin
-        .from("customers")
-        .select(`
-          *,
-          customer_profiles (*),
-          kyc_verifications (status),
-          customer_jars (
-            id,
-            initial_amount,
-            current_value
-          )
-        `)
-        .ilike("code", id)
-        .single());
-      // console.log("Customer by code:", customer, "Error:", error);
-    }
-
-    if (error || !customer) {
+    if (customerError || !customer) {
       return NextResponse.json(
         { error: "Customer not found" },
         { status: 404 }
       )
     }
-
-    // Map to CustomerProfile shape
+    // Fetch customer profile
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("customer_profiles")
+      .select("address_line1, address_line2, city, state, zip_code, country, date_of_birth, tax_id, occupation, employer_name, annual_income, source_of_funds, notes, receive_marketing_emails")
+      .eq("customer_id", id)
+      .single();
+    // Fetch KYC
+    const { data: kyc, error: kycError } = await supabaseAdmin
+      .from("kyc_verifications")
+      .select("full_name, date_of_birth, nationality, tax_country, id_number, document_type, status, verified_at, created_at, updated_at, front_url, back_url, selfie_url")
+      .eq("customer_id", id)
+      .single();
+    const kycObj = {
+      full_name: kyc?.full_name || "",
+      date_of_birth: kyc?.date_of_birth || "",
+      nationality: kyc?.nationality || "",
+      tax_country: kyc?.tax_country || "",
+      id_number: kyc?.id_number || "",
+      document_type: kyc?.document_type || "",
+      status: kyc?.status || "pending",
+      verified_at: kyc?.verified_at || "",
+      created_at: kyc?.created_at || "",
+      updated_at: kyc?.updated_at || "",
+      front_url: kyc?.front_url || "",
+      back_url: kyc?.back_url || "",
+      selfie_url: kyc?.selfie_url || "",
+    }
     const result = {
       id: customer.id,
-      firstName: customer.first_name,
-      lastName: customer.last_name,
       email: customer.email,
-      phone: customer.phone,
-      status: customer.is_active ? "active" : "inactive",
-      kycStatus: customer.kyc_verifications?.[0]?.status || "pending",
-      addressLine1: customer.customer_profiles?.address_line1,
-      addressLine2: customer.customer_profiles?.address_line2,
-      city: customer.customer_profiles?.city,
-      state: customer.customer_profiles?.state,
-      zipCode: customer.customer_profiles?.zip_code,
-      country: customer.customer_profiles?.country,
-      dateOfBirth: customer.customer_profiles?.date_of_birth,
-      taxId: customer.customer_profiles?.tax_id,
-      occupation: customer.customer_profiles?.occupation,
-      employerName: customer.customer_profiles?.employer_name,
-      annualIncome: customer.customer_profiles?.annual_income?.toString(),
-      sourceOfFunds: customer.customer_profiles?.source_of_funds,
-      notes: customer.customer_profiles?.notes,
-      receiveMarketingEmails: customer.customer_profiles?.receive_marketing_emails || false,
-      totalInvested: customer.customer_jars?.reduce((sum: number, jar: any) => sum + jar.current_value, 0) || 0,
-      jars: customer.customer_jars?.length || 0,
-      createdAt: customer.created_at,
-      updatedAt: customer.updated_at,
+      first_name: customer.first_name,
+      last_name: customer.last_name,
+      is_active: customer.is_active,
+      ...profile,
+      kyc_status: kycObj.status,
+      kyc: kycObj,
     }
     return NextResponse.json(result)
   } catch (error) {
@@ -93,13 +70,40 @@ export async function PUT(
   const id = params.id;
   try {
     const data = await request.json()
-    const customer = await supabaseAdmin
+    // Update customers table
+    const updateFields = {
+      first_name: data.first_name,
+      last_name: data.last_name,
+      email: data.email,
+      is_active: data.is_active,
+    }
+    await supabaseAdmin
       .from("customers")
-      .update(data)
+      .update(updateFields)
       .eq("id", id)
-      .select()
-      .single()
-    return NextResponse.json(customer)
+    // Update customer_profiles table
+    const profileFields = {
+      address_line1: data.address_line1,
+      address_line2: data.address_line2,
+      city: data.city,
+      state: data.state,
+      zip_code: data.zip_code,
+      country: data.country,
+      date_of_birth: data.date_of_birth,
+      tax_id: data.tax_id,
+      occupation: data.occupation,
+      employer_name: data.employer_name,
+      annual_income: data.annual_income,
+      source_of_funds: data.source_of_funds,
+      notes: data.notes,
+      receive_marketing_emails: data.receive_marketing_emails,
+      updated_at: new Date().toISOString(),
+    }
+    await supabaseAdmin
+      .from("customer_profiles")
+      .update(profileFields)
+      .eq("customer_id", id)
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error updating customer:", error)
     return NextResponse.json(

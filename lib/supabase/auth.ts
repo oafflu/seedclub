@@ -19,16 +19,12 @@ export const customerSignUp = async (
   phone?: string
 ): Promise<AuthResponse> => {
   try {
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10)
-
     // First, create the customer record with pending verification
     const { data: customer, error: customerError } = await supabase
       .from('customers')
       .insert([
         {
           email,
-          encrypted_password: hashedPassword,
           first_name: firstName,
           last_name: lastName,
           phone,
@@ -54,73 +50,6 @@ export const customerSignUp = async (
       ])
 
     if (walletError) throw walletError
-
-    return {
-      success: true,
-      user: customer
-    }
-  } catch (error: any) {
-    console.error('Registration/Login error:', error)
-    console.error('Registration/Login error (typeof):', typeof error, error)
-    console.error('Registration/Login error (keys):', Object.keys(error))
-    let errorMsg = "Unknown error"
-    if (error) {
-      if (typeof error === "string") {
-        errorMsg = error
-      } else if (error.message) {
-        errorMsg = error.message
-      } else if (error.error_description) {
-        errorMsg = error.error_description
-      } else if (error.msg) {
-        errorMsg = error.msg
-      } else if (typeof error === "object" && Object.keys(error).length === 0) {
-        errorMsg = "Unknown error (empty object). This may be a database constraint violation, a Supabase misconfiguration, or a permissions issue. Please check your Supabase table schema and API keys."
-      } else {
-        try {
-          errorMsg = JSON.stringify(error)
-        } catch {
-          errorMsg = String(error)
-        }
-      }
-    }
-    return {
-      success: false,
-      error: errorMsg
-    }
-  }
-}
-
-export const customerLogin = async (
-  email: string,
-  password: string
-): Promise<AuthResponse> => {
-  try {
-    const { data: customer, error } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('email', email)
-      .single()
-
-    if (error) throw error
-
-    if (!customer.is_active) {
-      throw new Error('Account is inactive')
-    }
-
-    // Compare password using bcrypt
-    const passwordMatch = await bcrypt.compare(password, customer.encrypted_password)
-    if (!passwordMatch) {
-      throw new Error('Invalid password')
-    }
-
-    // Update last login
-    await supabase
-      .from('customers')
-      .update({ 
-        last_login_at: new Date().toISOString(),
-        last_login_ip: await getCurrentIP()
-      })
-      .eq('id', customer.id)
 
     return {
       success: true,

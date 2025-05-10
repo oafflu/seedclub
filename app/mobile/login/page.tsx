@@ -86,6 +86,9 @@ export default function LoginPage() {
         firstName: customer.first_name,
         lastName: customer.last_name
       }))
+      localStorage.setItem('isAuthenticated', 'true')
+      localStorage.setItem('userName', customer.first_name + (customer.last_name ? ' ' + customer.last_name : ''))
+      localStorage.setItem('userEmail', customer.email)
 
       toast({
         title: "Login successful",

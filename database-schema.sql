@@ -506,6 +506,7 @@ CREATE TABLE customer_profiles (
     source_of_funds VARCHAR(50),
     notes TEXT,
     receive_marketing_emails BOOLEAN DEFAULT FALSE,
+    profile_picture_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

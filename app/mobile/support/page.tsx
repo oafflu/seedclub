@@ -18,21 +18,23 @@ export default function SupportPage() {
   const [message, setMessage] = useState("")
   const [subject, setSubject] = useState("")
   const [tickets, setTickets] = useState<any[]>([])
-  const [loadingTickets, setLoadingTickets] = useState(false)
+  const [loadingTickets, setLoadingTickets] = useState(true)
   const [selectedTicket, setSelectedTicket] = useState<any>(null)
   const [reply, setReply] = useState("")
   const [messages, setMessages] = useState<any[]>([])
   const [loadingMessages, setLoadingMessages] = useState(false)
+  const [activeTab, setActiveTab] = useState("contact")
+  const [mounted, setMounted] = useState(false)
 
-  // Fetch tickets for 'My Tickets' tab
+  useEffect(() => { setMounted(true); }, [])
+
+  // Fetch tickets for 'My Tickets' tab (no typeof window check needed)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setLoadingTickets(true)
-      fetch("/api/support")
-        .then((res) => res.json())
-        .then((data) => setTickets(data.tickets || []))
-        .finally(() => setLoadingTickets(false))
-    }
+    setLoadingTickets(true)
+    fetch("/api/support")
+      .then((res) => res.json())
+      .then((data) => setTickets(data.tickets || []))
+      .finally(() => setLoadingTickets(false))
   }, [])
 
   // Fetch messages for selected ticket
@@ -46,14 +48,48 @@ export default function SupportPage() {
     }
   }, [selectedTicket])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    toast({
-      title: "Support request submitted",
-      description: "We'll get back to you as soon as possible.",
-    })
-    setMessage("")
-    setSubject("")
+    if (!subject.trim() || !message.trim()) return
+    try {
+      const res = await fetch("/api/support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject,
+          description: message,
+          category: "General",
+          priority: "medium"
+        })
+      })
+      if (res.ok) {
+        toast({
+          title: "Support request submitted",
+          description: "We'll get back to you as soon as possible.",
+        })
+        setMessage("")
+        setSubject("")
+        // Refresh tickets
+        setLoadingTickets(true)
+        fetch("/api/support")
+          .then((res) => res.json())
+          .then((data) => setTickets(data.tickets || []))
+          .finally(() => setLoadingTickets(false))
+      } else {
+        const data = await res.json()
+        toast({
+          title: "Error",
+          description: data.error || "Failed to submit support request.",
+          variant: "destructive",
+        })
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit support request.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleReply = async (e: React.FormEvent) => {
@@ -76,6 +112,24 @@ export default function SupportPage() {
     }
   }
 
+  function clientFormattedDate(dateString: string | null | undefined) {
+    if (!mounted || !dateString) return ""
+    try {
+      return new Date(dateString).toLocaleString()
+    } catch {
+      return ""
+    }
+  }
+
+  // Only render the main UI after mount and tickets are loaded
+  if (!mounted || loadingTickets) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
   return (
     <div className="container space-y-6 px-4 py-6 pb-16 md:pb-6">
       <div className="flex items-center">
@@ -87,7 +141,7 @@ export default function SupportPage() {
         <h1 className="text-2xl font-bold">Support</h1>
       </div>
 
-      <Tabs defaultValue="contact" className="w-full">
+      <Tabs defaultValue="contact" value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="contact">Contact Us</TabsTrigger>
           <TabsTrigger value="faq">FAQs</TabsTrigger>
@@ -132,27 +186,7 @@ export default function SupportPage() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center p-6">
-                <div className="mb-4 rounded-full bg-primary/10 p-3">
-                  <MessageSquare className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="text-center text-lg font-medium">Live Chat</h3>
-                <p className="text-center text-sm text-muted-foreground">Available 9am-5pm</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center p-6">
-                <div className="mb-4 rounded-full bg-primary/10 p-3">
-                  <Phone className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="text-center text-lg font-medium">Call Us</h3>
-                <p className="text-center text-sm text-muted-foreground">+1 (800) 123-4567</p>
-              </CardContent>
-            </Card>
-
+          <div className="grid gap-4 md:grid-cols-1">
             <Card>
               <CardContent className="flex flex-col items-center justify-center p-6">
                 <div className="mb-4 rounded-full bg-primary/10 p-3">
@@ -217,9 +251,7 @@ export default function SupportPage() {
                   <h3 className="font-medium">Still have questions?</h3>
                   <p className="text-sm text-muted-foreground">Contact our support team for personalized assistance.</p>
                 </div>
-                <Button variant="outline" size="sm" className="ml-auto" asChild>
-                  <Link href="/mobile/support?tab=contact">Contact Us</Link>
-                </Button>
+                <Button variant="outline" size="sm" className="ml-auto" onClick={() => setActiveTab("contact")}>Contact Us</Button>
               </div>
             </CardContent>
           </Card>
@@ -254,7 +286,7 @@ export default function SupportPage() {
                           <div className="mt-4 border-t pt-2">
                             <div className="mb-2 text-sm text-muted-foreground">Category: {ticket.category} | Priority: {ticket.priority}</div>
                             <div className="mb-2 text-sm">{ticket.description}</div>
-                            <div className="mb-2 text-xs text-muted-foreground">Created: {new Date(ticket.created_at).toLocaleString()}</div>
+                            <div className="mb-2 text-xs text-muted-foreground">Created: {clientFormattedDate(ticket.created_at)}</div>
                             <div className="font-semibold mb-1">Messages</div>
                             {loadingMessages ? (
                               <div className="text-xs text-muted-foreground">Loading messages...</div>
@@ -265,7 +297,7 @@ export default function SupportPage() {
                                 {messages.map((msg) => (
                                   <div key={msg.id} className={`rounded p-2 text-sm ${msg.sender_type === 'customer' ? 'bg-primary/10 text-primary' : 'bg-muted'}`}>
                                     <div>{msg.message}</div>
-                                    <div className="text-xs text-muted-foreground mt-1">{new Date(msg.created_at).toLocaleString()}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">{clientFormattedDate(msg.created_at)}</div>
                                   </div>
                                 ))}
                               </div>

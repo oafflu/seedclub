@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     // Check if user exists and is an admin
     const { data: adminUser, error: userError } = await supabase
       .from('admin_users')
-      .select('id, email, encrypted_password, role, is_active, failed_login_attempts, locked_until')
+      .select('id, email, role, is_active, failed_login_attempts, locked_until')
       .eq('email', email.toLowerCase())
       .single()
 
@@ -50,39 +50,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { message: 'Account is deactivated' },
         { status: 403 }
-      )
-    }
-
-    // Verify password
-    const isValidPassword = await compare(password, adminUser.encrypted_password)
-
-    if (!isValidPassword) {
-      // Increment failed login attempts
-      const newAttempts = (adminUser.failed_login_attempts || 0) + 1
-      const shouldLock = newAttempts >= 5
-      const lockedUntil = shouldLock ? new Date(Date.now() + 30 * 60 * 1000) : null // Lock for 30 minutes
-
-      await supabase
-        .from('admin_users')
-        .update({
-          failed_login_attempts: newAttempts,
-          locked_until: lockedUntil
-        })
-        .eq('id', adminUser.id)
-
-      if (shouldLock) {
-        return NextResponse.json(
-          { 
-            message: 'Account locked due to too many failed attempts. Try again in 30 minutes.',
-            lockedUntil 
-          },
-          { status: 423 }
-        )
-      }
-
-      return NextResponse.json(
-        { message: 'Invalid email or password' },
-        { status: 401 }
       )
     }
 

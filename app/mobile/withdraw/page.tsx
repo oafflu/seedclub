@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { ArrowLeft, BanknoteIcon as Bank, CreditCard, ChevronRight, Check, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -37,6 +37,31 @@ const paymentMethods = [
     icon: CreditCard,
   },
 ]
+
+// Helper for client-only number formatting
+function useClientFormattedNumber(num: number | string | null | undefined) {
+  const [formatted, setFormatted] = useState<string>("")
+  useEffect(() => {
+    if (num === null || num === undefined) return
+    setFormatted("")
+    setTimeout(() => {
+      setFormatted(Number(num).toLocaleString())
+    }, 0)
+  }, [num])
+  return formatted
+}
+
+// Helper for client-only random reference
+function useClientRandomRef() {
+  const [ref, setRef] = useState<string>("")
+  useEffect(() => {
+    setRef("")
+    setTimeout(() => {
+      setRef("WD-" + Math.floor(Math.random() * 1000000))
+    }, 0)
+  }, [])
+  return ref
+}
 
 export default function WithdrawPage() {
   const [step, setStep] = useState(1)
@@ -234,7 +259,7 @@ export default function WithdrawPage() {
                   <div className="rounded-lg bg-muted p-4">
                     <div className="mb-4 flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Amount</span>
-                      <span className="text-xl font-bold">${Number.parseFloat(amount).toLocaleString()}</span>
+                      <span className="text-xl font-bold">{useClientFormattedNumber(amount)}</span>
                     </div>
                     <Separator className="my-2" />
                     <div className="mb-4 flex items-center justify-between">
@@ -244,7 +269,7 @@ export default function WithdrawPage() {
                     <Separator className="my-2" />
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Total</span>
-                      <span className="text-lg font-bold">${Number.parseFloat(amount).toLocaleString()}</span>
+                      <span className="text-lg font-bold">{useClientFormattedNumber(amount)}</span>
                     </div>
                   </div>
 
@@ -293,13 +318,12 @@ export default function WithdrawPage() {
             </div>
             <h2 className="mb-2 text-xl font-bold">Withdrawal Initiated</h2>
             <p className="mb-6 text-muted-foreground">
-              Your withdrawal of ${Number.parseFloat(amount).toLocaleString()} has been initiated and will be processed
-              shortly.
+              Your withdrawal of ${useClientFormattedNumber(amount)} has been initiated and will be processed shortly.
             </p>
             <div className="mb-6 w-full rounded-lg bg-muted p-4">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Amount</span>
-                <span className="font-medium">${Number.parseFloat(amount).toLocaleString()}</span>
+                <span className="font-medium">${useClientFormattedNumber(amount)}</span>
               </div>
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Method</span>
@@ -307,7 +331,7 @@ export default function WithdrawPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Reference ID</span>
-                <span className="font-medium">WD-{Math.floor(Math.random() * 1000000)}</span>
+                <span className="font-medium">{useClientRandomRef()}</span>
               </div>
             </div>
             <div className="flex w-full gap-3">

@@ -29,6 +29,21 @@ export interface CustomerProfile {
   // Investment related fields
   totalInvested?: number
   jars?: number
+  kyc?: {
+    fullName: string
+    dateOfBirth: string
+    nationality: string
+    taxCountry: string
+    idNumber: string
+    documentType: string
+    status: string
+    verifiedAt: string
+    createdAt: string
+    updatedAt: string
+    frontUrl: string
+    backUrl: string
+    selfieUrl: string
+  }
 }
 
 class CustomerService {
@@ -115,6 +130,21 @@ class CustomerService {
           jars: jars.length,
           createdAt: customer.created_at,
           updatedAt: customer.updated_at,
+          kyc: kyc ? {
+            fullName: kyc.full_name,
+            dateOfBirth: kyc.date_of_birth,
+            nationality: kyc.nationality,
+            taxCountry: kyc.tax_country,
+            idNumber: kyc.id_number,
+            documentType: kyc.document_type,
+            status: kyc.status,
+            verifiedAt: kyc.verified_at,
+            createdAt: kyc.created_at,
+            updatedAt: kyc.updated_at,
+            frontUrl: kyc.front_url,
+            backUrl: kyc.back_url,
+            selfieUrl: kyc.selfie_url,
+          } : undefined,
         }
       })
     } catch (error) {
@@ -126,7 +156,52 @@ class CustomerService {
   async getCustomerById(id: string): Promise<CustomerProfile | null> {
     const res = await fetch(`/api/admin/customers/${id}`);
     if (!res.ok) return null;
-    return res.json();
+    const data = await res.json();
+    // Map snake_case to camelCase for the returned object
+    return {
+      id: data.id,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      email: data.email,
+      status: data.is_active ? "active" : "inactive",
+      kycStatus: data.kyc_status || "pending",
+      dateOfBirth: data.date_of_birth || "",
+      occupation: data.occupation || "",
+      employerName: data.employer_name || "",
+      // The following fields are not returned by the API, so set to default values
+      phone: "",
+      addressLine1: "",
+      addressLine2: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      country: "United States",
+      taxId: "",
+      annualIncome: 0,
+      sourceOfFunds: "",
+      notes: "",
+      receiveMarketingEmails: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      totalInvested: 0,
+      jars: 0,
+      // KYC details for admin review
+      kyc: data.kyc ? {
+        fullName: data.kyc.full_name,
+        dateOfBirth: data.kyc.date_of_birth,
+        nationality: data.kyc.nationality,
+        taxCountry: data.kyc.tax_country,
+        idNumber: data.kyc.id_number,
+        documentType: data.kyc.document_type,
+        status: data.kyc.status,
+        verifiedAt: data.kyc.verified_at,
+        createdAt: data.kyc.created_at,
+        updatedAt: data.kyc.updated_at,
+        frontUrl: data.kyc.front_url,
+        backUrl: data.kyc.back_url,
+        selfieUrl: data.kyc.selfie_url,
+      } : undefined,
+    };
   }
 
   async createCustomer(data: Partial<CustomerProfile>): Promise<CustomerProfile> {

@@ -9,9 +9,18 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Slider } from "@/components/ui/slider"
 import Image from "next/image"
 
+// MOCK CUSTOMER DATA FOR DEVELOPMENT/DEMO PURPOSES
+const mockCustomer = {
+  id: 'mock-customer-id',
+  firstName: 'Jane',
+  lastName: 'Doe',
+  email: 'jane.doe@example.com',
+}
+
 export default function MobileDashboard() {
-  const [userName, setUserName] = useState("")
+  const [userName, setUserName] = useState(`${mockCustomer.firstName} ${mockCustomer.lastName}`)
   const [isLoading, setIsLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
   const [sproutFundSimulation, setSproutFundSimulation] = useState({
     currentProgress: 5,
@@ -41,24 +50,54 @@ export default function MobileDashboard() {
   })
 
   useEffect(() => {
-    // Check if user is authenticated
-    const isAuthenticated = localStorage.getItem("isAuthenticated")
-    if (!isAuthenticated) {
-      router.push("/auth/login")
-      return
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+    const fetchUserName = async () => {
+      try {
+        // Get session from Supabase client
+        const supabase = require('@supabase/auth-helpers-nextjs').createClientComponentClient()
+        const { data: { session } } = await supabase.auth.getSession()
+        let name = ''
+        if (session?.user) {
+          // Direct fetch with correct headers
+          const headers = new Headers({
+            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+            Authorization: `Bearer ${session.access_token}`,
+            Accept: 'application/json',
+          })
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/customers?select=first_name,last_name&id=eq.${session.user.id}`,
+            {
+              headers,
+            }
+          )
+          const arr = await res.json()
+          const customer = arr && arr[0]
+          if (customer) {
+            name = (customer.first_name || '') + (customer.last_name ? ' ' + customer.last_name : '')
+          }
+        }
+        if (!name.trim()) {
+          name = 'User'
+        }
+        setUserName(name)
+        setIsLoading(false)
+      } catch {
+        setUserName('User')
+        setIsLoading(false)
+      }
     }
-    
-    // Get user name from local storage or session
-    const storedUserName = localStorage.getItem("userName") || "User"
-    setUserName(storedUserName)
-    setIsLoading(false)
-  }, [router])
+    fetchUserName()
+  }, [mounted, router])
 
   const calculateProjectedProfit = (amount: number, rate: number, progress: number) => {
     return (amount * (rate / 100) * (progress / 100)).toFixed(2)
   }
 
-  if (isLoading) {
+  if (!mounted || isLoading || userName === null) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>

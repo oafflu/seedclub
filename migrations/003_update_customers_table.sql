@@ -17,4 +17,7 @@ ALTER TABLE customers ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZO
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 
 -- Add 'code' field to customers table for short customer code (e.g., CUST-001)
-ALTER TABLE customers ADD COLUMN IF NOT EXISTS code VARCHAR(20) UNIQUE; 
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS code VARCHAR(20) UNIQUE;
+
+-- Drop user_id column if it exists
+ALTER TABLE customers DROP COLUMN IF EXISTS user_id; 

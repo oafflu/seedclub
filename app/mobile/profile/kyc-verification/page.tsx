@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { ArrowLeft, Upload, Shield, CheckCircle, AlertTriangle, Info, Camera } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -16,37 +16,112 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+
+const countryList = [
+  "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czech Republic", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "East Timor", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Korea, North", "Korea, South", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"
+]
 
 export default function KYCVerificationPage() {
   const [verificationStatus, setVerificationStatus] = useState<
     "not_started" | "in_progress" | "pending_review" | "verified" | "rejected"
-  >("in_progress")
+  >("not_started")
   const [activeTab, setActiveTab] = useState("personal")
   const [progress, setProgress] = useState(25)
+  const [kycData, setKycData] = useState<any>({})
+  const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [docFront, setDocFront] = useState<File | null>(null)
+  const [docBack, setDocBack] = useState<File | null>(null)
+  const [selfie, setSelfie] = useState<File | null>(null)
+  const supabase = createClientComponentClient()
 
-  // Mock function to handle document upload
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // In a real app, you would handle the file upload to a server
-    if (e.target.files && e.target.files.length > 0) {
-      // Simulate progress update
-      setProgress((prev) => Math.min(prev + 25, 75))
+  // Fetch KYC status and details on mount
+  useEffect(() => {
+    const fetchKyc = async () => {
+      setLoading(true)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
+        setLoading(false)
+        return
+      }
+      setUserId(session.user.id)
+      // Fetch KYC record
+      const { data, error } = await supabase
+        .from("kyc_verifications")
+        .select("*")
+        .eq("customer_id", session.user.id)
+        .single()
+      if (data) {
+        setKycData(data)
+        setVerificationStatus(data.status as any)
+        if (data.status === "verified") setProgress(100)
+        else if (data.status === "pending_review") setProgress(75)
+        else if (data.status === "in_progress") setProgress(50)
+        else setProgress(25)
+      }
+      setLoading(false)
+    }
+    fetchKyc()
+  }, [])
 
-      if (activeTab === "document" && progress >= 50) {
-        setVerificationStatus("pending_review")
+  // Handle personal info submit
+  const handlePersonalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const form = e.target as HTMLFormElement
+    const fullName = (form["full-name"] as HTMLInputElement).value
+    const dob = (form["dob"] as HTMLInputElement).value
+    const nationality = (form["nationality"] as HTMLInputElement).value
+    const taxCountry = (form["tax-country"] as HTMLInputElement).value
+    const idType = (form["id-type"] as HTMLInputElement)?.value || "passport"
+    const idNumber = (form["id-number"] as HTMLInputElement).value
+    if (!userId) return
+    // Upsert KYC record
+    await supabase.from("kyc_verifications").upsert([
+      {
+        customer_id: userId,
+        document_type: idType,
+        status: "in_progress",
+        full_name: fullName,
+        date_of_birth: dob,
+        nationality,
+        tax_country: taxCountry,
+        id_number: idNumber,
+        updated_at: new Date().toISOString(),
+      }
+    ], { onConflict: "customer_id" })
+    setActiveTab("document")
+    setProgress(50)
+    setVerificationStatus("in_progress")
+  }
+
+  // Handle document upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: "front" | "back" | "selfie") => {
+    if (e.target.files && e.target.files.length > 0 && userId) {
+      const file = e.target.files[0]
+      let path = `kyc/${userId}/${type}-${Date.now()}-${file.name}`
+      const { data, error } = await supabase.storage.from("kyc-documents").upload(path, file, { upsert: true })
+      if (!error) {
+        if (type === "front") setDocFront(file)
+        if (type === "back") setDocBack(file)
+        if (type === "selfie") setSelfie(file)
+        // Save file URL to KYC record
+        const url = data?.path ? supabase.storage.from("kyc-documents").getPublicUrl(data.path).data.publicUrl : null
+        await supabase.from("kyc_verifications").update({ [`${type}_url`]: url, updated_at: new Date().toISOString() }).eq("customer_id", userId)
       }
     }
   }
 
-  // Mock function to submit the form
-  const handleSubmit = (e: React.FormEvent) => {
+  // Handle document submit
+  const handleDocumentSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (activeTab === "personal") {
-      setActiveTab("document")
-      setProgress(50)
-    } else {
-      setVerificationStatus("pending_review")
-      setProgress(75)
-    }
+    if (!userId) return
+    await supabase.from("kyc_verifications").update({
+      status: "pending_review",
+      updated_at: new Date().toISOString(),
+    }).eq("customer_id", userId)
+    setVerificationStatus("pending_review")
+    setProgress(75)
   }
 
   return (
@@ -159,7 +234,7 @@ export default function KYCVerificationPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handlePersonalSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="full-name">Full Legal Name</Label>
@@ -173,32 +248,28 @@ export default function KYCVerificationPage() {
 
                     <div className="space-y-2">
                       <Label htmlFor="nationality">Nationality</Label>
-                      <Select required>
+                      <Select required name="nationality">
                         <SelectTrigger id="nationality">
                           <SelectValue placeholder="Select your nationality" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="us">United States</SelectItem>
-                          <SelectItem value="ca">Canada</SelectItem>
-                          <SelectItem value="uk">United Kingdom</SelectItem>
-                          <SelectItem value="au">Australia</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
+                          {countryList.map((country) => (
+                            <SelectItem key={country} value={country}>{country}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="tax-country">Country of Tax Residence</Label>
-                      <Select required>
+                      <Select required name="tax-country">
                         <SelectTrigger id="tax-country">
                           <SelectValue placeholder="Select country" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="us">United States</SelectItem>
-                          <SelectItem value="ca">Canada</SelectItem>
-                          <SelectItem value="uk">United Kingdom</SelectItem>
-                          <SelectItem value="au">Australia</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
+                          {countryList.map((country) => (
+                            <SelectItem key={country} value={country}>{country}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -244,7 +315,7 @@ export default function KYCVerificationPage() {
                 <CardDescription>Please upload clear photos or scans of your identification documents.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <Alert variant="outline" className="bg-blue-50 border-blue-200">
+                <Alert className="bg-blue-50 border-blue-200">
                   <Info className="h-4 w-4 text-blue-500" />
                   <AlertTitle className="text-blue-800">Document Requirements</AlertTitle>
                   <AlertDescription className="text-blue-700">
@@ -267,11 +338,20 @@ export default function KYCVerificationPage() {
                         className="hidden"
                         id="id-front"
                         accept="image/jpeg,image/png,application/pdf"
-                        onChange={handleFileUpload}
+                        onChange={(e) => handleFileUpload(e, "front")}
                       />
                       <Button variant="outline" onClick={() => document.getElementById("id-front")?.click()}>
                         Select File
                       </Button>
+                      {docFront && (
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          {docFront.type.startsWith('image') ? (
+                            <img src={URL.createObjectURL(docFront)} alt="ID Front Preview" className="max-h-24 rounded border" />
+                          ) : (
+                            <span>{docFront.name}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -285,11 +365,20 @@ export default function KYCVerificationPage() {
                         className="hidden"
                         id="id-back"
                         accept="image/jpeg,image/png,application/pdf"
-                        onChange={handleFileUpload}
+                        onChange={(e) => handleFileUpload(e, "back")}
                       />
                       <Button variant="outline" onClick={() => document.getElementById("id-back")?.click()}>
                         Select File
                       </Button>
+                      {docBack && (
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          {docBack.type.startsWith('image') ? (
+                            <img src={URL.createObjectURL(docBack)} alt="ID Back Preview" className="max-h-24 rounded border" />
+                          ) : (
+                            <span>{docBack.name}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -309,8 +398,17 @@ export default function KYCVerificationPage() {
                         className="hidden"
                         id="selfie"
                         accept="image/jpeg,image/png"
-                        onChange={handleFileUpload}
+                        onChange={(e) => handleFileUpload(e, "selfie")}
                       />
+                      {selfie && (
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          {selfie.type.startsWith('image') ? (
+                            <img src={URL.createObjectURL(selfie)} alt="Selfie Preview" className="max-h-24 rounded border" />
+                          ) : (
+                            <span>{selfie.name}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -319,7 +417,7 @@ export default function KYCVerificationPage() {
                 <Button variant="outline" onClick={() => setActiveTab("personal")}>
                   Back
                 </Button>
-                <Button onClick={handleSubmit}>Submit for Verification</Button>
+                <Button onClick={handleDocumentSubmit}>Submit for Verification</Button>
               </CardFooter>
             </Card>
           </TabsContent>

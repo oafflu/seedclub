@@ -10,12 +10,31 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     // Only fetch tickets for this customer
-    const { data: tickets, error } = await supabaseAdmin
+    let { data: tickets, error } = await supabaseAdmin
       .from('support_tickets')
       .select('*')
       .eq('customer_id', session.user.id)
       .order('created_at', { ascending: false })
     if (error) throw error
+
+    // Fallback: if no tickets, try by email if available
+    if ((!tickets || tickets.length === 0) && session.user.email) {
+      const { data: emailTickets, error: emailError } = await supabaseAdmin
+        .from('support_tickets')
+        .select('*')
+        .eq('email', session.user.email)
+        .order('created_at', { ascending: false })
+      if (emailError) throw emailError
+      // Merge and deduplicate by id
+      const allTickets = [...(tickets || []), ...(emailTickets || [])]
+      const deduped = Object.values(
+        allTickets.reduce((acc, t) => {
+          acc[t.id] = t
+          return acc
+        }, {})
+      )
+      return NextResponse.json({ tickets: deduped })
+    }
     return NextResponse.json({ tickets })
   } catch (error) {
     console.error('Error fetching tickets:', error)

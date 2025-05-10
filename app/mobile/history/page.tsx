@@ -2,6 +2,7 @@
 import { ArrowUpRight, ArrowDownRight, Clock } from "lucide-react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useEffect, useState } from "react"
 
 // Mock data for demonstration
 const mockTransactions = [
@@ -30,6 +31,19 @@ const mockTransactions = [
     method: "System",
   },
 ]
+
+// Helper for client-only number formatting
+function useClientFormattedNumber(num: number | string | null | undefined) {
+  const [formatted, setFormatted] = useState<string>("")
+  useEffect(() => {
+    if (num === null || num === undefined) return
+    setFormatted("")
+    setTimeout(() => {
+      setFormatted(Number(num).toLocaleString())
+    }, 0)
+  }, [num])
+  return formatted
+}
 
 export default function HistoryPage() {
   return (
@@ -81,7 +95,7 @@ export default function HistoryPage() {
                         : ""
                   }`}
                 >
-                  {tx.type === "deposit" || tx.type === "interest" ? "+" : "-"}${tx.amount.toLocaleString()}
+                  {tx.type === "deposit" || tx.type === "interest" ? "+" : "-"}${useClientFormattedNumber(tx.amount)}
                 </p>
               </li>
             ))}

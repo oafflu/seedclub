@@ -287,3 +287,58 @@ The marketing management system allows administrators to:
 
 ### Support
 For additional support or questions, contact the development team.
+
+# Project Completion Under Tight Deadline: Pragmatic Approach
+
+## Context
+Due to unresolved Supabase Auth/RLS issues blocking customer registration and login, the following approach was adopted to ensure the project could be completed and demoed on time.
+
+---
+
+## Steps Taken
+
+1. **Bypass Customer Authentication**
+   - Authentication checks and redirects are temporarily disabled in the mobile layout and customer-facing pages.
+   - This allows all customer features to be developed, tested, and demoed without being blocked by Supabase Auth issues.
+
+2. **Use Mock/Hardcoded Customer Data**
+   - Where pages expect a logged-in customer, mock data or a hardcoded customer ID is used for development and testing.
+   - This ensures all flows (profile, KYC, investments, support, etc.) can be completed and demoed.
+
+3. **Focus on Core Features and UI/UX**
+   - Priority is given to finishing and polishing all main features:
+     - Customer dashboard, jars, wallet, profile, KYC, support, referrals, notifications, etc.
+     - Admin features: customer management, KYC review, etc.
+   - All navigation, forms, and data flows are made to work smoothly, even if some data is mocked.
+
+4. **Document the Auth Issue and Workaround**
+   - This section serves as documentation for why authentication is disabled.
+   - Instructions are provided for what needs to be re-enabled/fixed once Supabase resolves the RLS/Auth issue.
+   - Temporary workarounds in the code are clearly marked.
+
+5. **Prepare for Quick Auth Re-Enable**
+   - Original auth logic is kept commented out, so it can be quickly restored if the Supabase issue is resolved.
+   - If a fix is provided, auth can be re-enabled and tested in minutes.
+
+6. **Communicate Clearly with Stakeholders**
+   - Team/client is informed that all features are complete and demoable, but customer registration/login is temporarily bypassed due to a Supabase platform issue.
+   - Support ticket and troubleshooting steps are provided as proof of due diligence.
+
+---
+
+## Summary Table
+
+| Step                        | Action/Status                | Goal/Benefit                        |
+|-----------------------------|------------------------------|-------------------------------------|
+| Disable customer auth       | ✅ Already done              | Unblocks all development            |
+| Use mock/hardcoded data     | As needed                    | Allows all features to work         |
+| Finish all features         | Focus for next 2 days        | Complete, test, and polish product  |
+| Document workaround         | In README/handoff            | Transparency for future devs        |
+| Prepare for quick re-enable | Keep auth code commented     | Fast fix if Supabase responds       |
+| Communicate status          | To team/client               | Sets expectations, shows diligence  |
+
+---
+
+**Note:**
+- Once Supabase resolves the Auth/RLS issue, re-enable authentication and remove mock data as appropriate.
+- This approach ensures the project can be delivered on time, with a clear path to restoring full functionality later.

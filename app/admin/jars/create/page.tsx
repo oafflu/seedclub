@@ -174,9 +174,6 @@ export default function CreateJarPage() {
                 .insert([{
                   id: session.user.id,
                   email: session.user.email,
-                  encrypted_password: securePassword,
-                  role: 'admin',
-                  is_active: true,
                   first_name: session.user.user_metadata?.first_name || null,
                   last_name: session.user.user_metadata?.last_name || null,
                   last_login_at: new Date().toISOString()

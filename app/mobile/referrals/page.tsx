@@ -137,6 +137,14 @@ const faqItems = [
   },
 ]
 
+// MOCK CUSTOMER DATA FOR DEVELOPMENT/DEMO PURPOSES
+const mockCustomer = {
+  id: 'mock-customer-id',
+  firstName: 'Jane',
+  lastName: 'Doe',
+  email: 'jane.doe@example.com',
+}
+
 export default function ReferralsPage() {
   const [copied, setCopied] = useState(false)
   const [activeTab, setActiveTab] = useState("all")

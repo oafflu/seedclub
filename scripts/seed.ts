@@ -27,7 +27,6 @@ async function seedDatabase() {
     const customers = [
       {
         email: 'john.doe@example.com',
-        encrypted_password: await bcrypt.hash('password123', 10),
         first_name: 'John',
         last_name: 'Doe',
         phone: '+1 (555) 123-4567',
@@ -36,7 +35,6 @@ async function seedDatabase() {
       },
       {
         email: 'jane.smith@example.com',
-        encrypted_password: await bcrypt.hash('password123', 10),
         first_name: 'Jane',
         last_name: 'Smith',
         phone: '+1 (555) 987-6543',
@@ -45,7 +43,6 @@ async function seedDatabase() {
       },
       {
         email: 'bob.wilson@example.com',
-        encrypted_password: await bcrypt.hash('password123', 10),
         first_name: 'Bob',
         last_name: 'Wilson',
         phone: '+1 (555) 456-7890',

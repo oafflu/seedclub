@@ -9,7 +9,6 @@ async function seedCustomers() {
     const customers = [
       {
         email: "john.smith@example.com",
-        encrypted_password: hashedPassword,
         first_name: "John",
         last_name: "Smith",
         phone: "+1 (555) 123-4567",
@@ -17,7 +16,6 @@ async function seedCustomers() {
       },
       {
         email: "sarah.johnson@example.com",
-        encrypted_password: hashedPassword,
         first_name: "Sarah",
         last_name: "Johnson",
         phone: "+1 (555) 987-6543",
@@ -25,7 +23,6 @@ async function seedCustomers() {
       },
       {
         email: "michael.brown@example.com",
-        encrypted_password: hashedPassword,
         first_name: "Michael",
         last_name: "Brown",
         phone: "+1 (555) 456-7890",

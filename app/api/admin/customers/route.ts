@@ -1,11 +1,33 @@
-import { NextResponse } from "next/server"
+import { NextResponse, NextRequest } from "next/server"
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const { data: customers, error } = await supabaseAdmin.from('customers').select('*')
-    if (error) throw error
-    return NextResponse.json(customers)
+    // Select all relevant fields
+    let { data: customers, error } = await supabaseAdmin
+      .from("customers")
+      .select("id, email, first_name, last_name, is_active, customer_profiles(address_line1, address_line2, city, state, zip_code, country, date_of_birth, tax_id, occupation, employer_name, annual_income, source_of_funds, notes, receive_marketing_emails), kyc_verifications(status)")
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      return NextResponse.json(
+        { error: error.message || "Failed to fetch customers" },
+        { status: 500 }
+      )
+    }
+
+    // Map kyc_status for each customer
+    const mapped = (customers || []).map((c: any) => ({
+      id: c.id,
+      email: c.email,
+      first_name: c.first_name,
+      last_name: c.last_name,
+      is_active: c.is_active,
+      ...c.customer_profiles,
+      kyc_status: c.kyc_verifications?.[0]?.status || "pending"
+    }))
+
+    return NextResponse.json(mapped)
   } catch (error) {
     console.error("Error fetching customers:", error)
     return NextResponse.json(

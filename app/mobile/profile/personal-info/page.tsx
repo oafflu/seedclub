@@ -14,6 +14,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useToast } from "@/hooks/use-toast"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+
+const countryList = [
+  "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czech Republic", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "East Timor", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Korea, North", "Korea, South", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"
+]
+
+const supabase = createClientComponentClient()
 
 export default function PersonalInfoPage() {
   const [formData, setFormData] = useState({
@@ -24,27 +31,35 @@ export default function PersonalInfoPage() {
     gender: "",
     nationality: "",
     bio: "",
+    profilePictureUrl: "",
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
-    // In a real app, you would fetch user data from an API
-    // For demo purposes, we'll use localStorage with some defaults
-    const userName = localStorage.getItem("userName") || "User"
-    const nameParts = userName.split(" ")
-    const firstName = nameParts[0] || ""
-    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : ""
-
-    setFormData({
-      firstName,
-      lastName,
-      displayName: userName,
-      dateOfBirth: "1990-01-01",
-      gender: "",
-      nationality: "us",
-      bio: "Investor on Seed Club",
-    })
+    const fetchProfile = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+      const { data: profile } = await supabase
+        .from("customer_profiles")
+        .select("first_name, last_name, date_of_birth, gender, nationality, bio, profile_picture_url")
+        .eq("customer_id", session.user.id)
+        .single()
+      if (profile) {
+        setFormData({
+          firstName: profile.first_name || "",
+          lastName: profile.last_name || "",
+          displayName: `${profile.first_name || ""} ${profile.last_name || ""}`.trim(),
+          dateOfBirth: profile.date_of_birth || "",
+          gender: profile.gender || "",
+          nationality: profile.nationality || "",
+          bio: profile.bio || "",
+          profilePictureUrl: profile.profile_picture_url || "",
+        })
+      }
+    }
+    fetchProfile()
   }, [])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -56,20 +71,54 @@ export default function PersonalInfoPage() {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleProfilePictureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return
+    const fileExt = file.name.split('.').pop()
+    const filePath = `profile-pictures/${session.user.id}.${fileExt}`
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, { upsert: true })
+    if (uploadError) {
+      toast({ title: "Upload failed", description: uploadError.message, variant: "destructive" })
+      setUploading(false)
+      return
+    }
+    const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(filePath)
+    const publicUrl = publicUrlData?.publicUrl || ""
+    await supabase
+      .from("customer_profiles")
+      .update({ profile_picture_url: publicUrl, updated_at: new Date().toISOString() })
+      .eq("customer_id", session.user.id)
+    setFormData((prev) => ({ ...prev, profilePictureUrl: publicUrl }))
+    setUploading(false)
+    toast({ title: "Profile picture updated", description: "Your profile picture has been uploaded." })
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-
-    // In a real app, you would update user data with an API call
-    setTimeout(() => {
-      // Update localStorage for demo purposes
-      localStorage.setItem("userName", `${formData.firstName} ${formData.lastName}`)
-      setIsLoading(false)
-      toast({
-        title: "Profile updated",
-        description: "Your personal information has been saved successfully.",
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return
+    await supabase
+      .from("customer_profiles")
+      .update({
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        date_of_birth: formData.dateOfBirth,
+        gender: formData.gender,
+        nationality: formData.nationality,
+        bio: formData.bio,
+        profile_picture_url: formData.profilePictureUrl,
+        updated_at: new Date().toISOString(),
       })
-    }, 1000)
+      .eq("customer_id", session.user.id)
+    setIsLoading(false)
+    toast({
+      title: "Profile updated",
+      description: "Your personal information has been saved successfully.",
+    })
   }
 
   return (
@@ -92,17 +141,40 @@ export default function PersonalInfoPage() {
           </CardHeader>
           <CardContent className="flex flex-col items-center space-y-4 sm:flex-row sm:items-start sm:space-x-4 sm:space-y-0">
             <Avatar className="h-24 w-24">
-              <AvatarImage src="/placeholder.svg" alt={formData.displayName} />
+              <AvatarImage src={formData.profilePictureUrl || "/placeholder.svg"} alt={formData.displayName} />
               <AvatarFallback className="text-2xl">
                 {formData.firstName.charAt(0)}
                 {formData.lastName.charAt(0)}
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col space-y-2">
-              <Button variant="outline" className="w-full">
-                Upload New Photo
-              </Button>
-              <Button variant="ghost" className="w-full text-destructive hover:text-destructive">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleProfilePictureChange}
+                disabled={uploading}
+                className="hidden"
+                id="profile-picture-upload"
+              />
+              <label htmlFor="profile-picture-upload">
+                <Button variant="outline" className="w-full" asChild>
+                  <span>{uploading ? "Uploading..." : "Upload New Photo"}</span>
+                </Button>
+              </label>
+              <Button
+                variant="ghost"
+                className="w-full text-destructive hover:text-destructive"
+                onClick={async () => {
+                  setFormData((prev) => ({ ...prev, profilePictureUrl: "" }))
+                  const { data: { session } } = await supabase.auth.getSession()
+                  if (!session?.user) return
+                  await supabase
+                    .from("customer_profiles")
+                    .update({ profile_picture_url: null, updated_at: new Date().toISOString() })
+                    .eq("customer_id", session.user.id)
+                  toast({ title: "Profile picture removed" })
+                }}
+              >
                 Remove Photo
               </Button>
               <p className="text-xs text-muted-foreground">
@@ -169,9 +241,6 @@ export default function PersonalInfoPage() {
                   <SelectContent>
                     <SelectItem value="male">Male</SelectItem>
                     <SelectItem value="female">Female</SelectItem>
-                    <SelectItem value="non-binary">Non-binary</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                    <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -185,11 +254,9 @@ export default function PersonalInfoPage() {
                     <SelectValue placeholder="Select nationality" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="us">United States</SelectItem>
-                    <SelectItem value="ca">Canada</SelectItem>
-                    <SelectItem value="uk">United Kingdom</SelectItem>
-                    <SelectItem value="au">Australia</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    {countryList.map((country) => (
+                      <SelectItem key={country} value={country}>{country}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

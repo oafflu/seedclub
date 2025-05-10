@@ -6,6 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { ArrowLeft, Save, Loader2 } from "lucide-react"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import Image from "next/image"
 
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -103,14 +105,30 @@ const customerFormSchema = z.object({
 
 type CustomerFormValues = z.infer<typeof customerFormSchema>
 
+// Add a full country list for the select
+const countryList = [
+  "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czech Republic", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "East Timor", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Korea, North", "Korea, South", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"
+]
+
 export default function EditCustomerPage() {
   const router = useRouter()
   const params = useParams()
   const customerId = params.id as string
 
+  // Guard clause for invalid customerId
+  if (!customerId || customerId === "null" || customerId === "undefined") {
+    useEffect(() => {
+      router.push("/admin/customers")
+    }, [router])
+    return <div className="p-8 text-center text-destructive font-semibold">Invalid customer ID.</div>
+  }
+
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [customer, setCustomer] = useState<CustomerProfile | null>(null)
+  const [kyc, setKyc] = useState<any>(null)
+  const [kycLoading, setKycLoading] = useState(true)
+  const supabase = createClientComponentClient()
 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerFormSchema),
@@ -186,6 +204,20 @@ export default function EditCustomerPage() {
     fetchCustomer()
   }, [customerId, form, router])
 
+  useEffect(() => {
+    async function fetchKyc() {
+      setKycLoading(true)
+      const { data, error } = await supabase
+        .from("kyc_verifications")
+        .select("*")
+        .eq("customer_id", customerId)
+        .single()
+      setKyc(data)
+      setKycLoading(false)
+    }
+    if (customerId) fetchKyc()
+  }, [customerId])
+
   const onSubmit = async (data: CustomerFormValues) => {
     try {
       console.log("Form submission started")
@@ -193,6 +225,20 @@ export default function EditCustomerPage() {
       console.log("Form submitted with data:", data)
 
       console.log("Updating customer with ID:", customerId)
+      const updateData = {
+        first_name: data.firstName,
+        last_name: data.lastName,
+        email: data.email,
+        date_of_birth: data.dateOfBirth,
+        occupation: data.occupation,
+        employer_name: data.employerName,
+        // ... other fields ...
+      }
+      const response = await fetch(`/api/admin/customers/${customerId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      })
       const updatedCustomer = await customerService.updateCustomer(customerId, {
         ...data,
         // Map address fields correctly
@@ -223,6 +269,12 @@ export default function EditCustomerPage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleKycStatus = async (status: "verified" | "rejected") => {
+    await supabase.from("kyc_verifications").update({ status, updated_at: new Date().toISOString() }).eq("customer_id", customerId)
+    setKyc((prev: any) => ({ ...prev, status }))
+    toast({ title: `KYC ${status === "verified" ? "approved" : "rejected"}` })
   }
 
   if (isLoading) {
@@ -307,11 +359,12 @@ export default function EditCustomerPage() {
           className="space-y-8"
         >
           <Tabs defaultValue="personal" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="personal">Personal Information</TabsTrigger>
               <TabsTrigger value="contact">Contact Details</TabsTrigger>
               <TabsTrigger value="financial">Financial Information</TabsTrigger>
               <TabsTrigger value="settings">Account Settings</TabsTrigger>
+              <TabsTrigger value="kyc">KYC</TabsTrigger>
             </TabsList>
 
             {/* Personal Information Tab */}
@@ -521,201 +574,9 @@ export default function EditCustomerPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="Afghanistan">Afghanistan</SelectItem>
-                            <SelectItem value="Albania">Albania</SelectItem>
-                            <SelectItem value="Algeria">Algeria</SelectItem>
-                            <SelectItem value="Andorra">Andorra</SelectItem>
-                            <SelectItem value="Angola">Angola</SelectItem>
-                            <SelectItem value="Antigua and Barbuda">Antigua and Barbuda</SelectItem>
-                            <SelectItem value="Argentina">Argentina</SelectItem>
-                            <SelectItem value="Armenia">Armenia</SelectItem>
-                            <SelectItem value="Australia">Australia</SelectItem>
-                            <SelectItem value="Austria">Austria</SelectItem>
-                            <SelectItem value="Azerbaijan">Azerbaijan</SelectItem>
-                            <SelectItem value="Bahamas">Bahamas</SelectItem>
-                            <SelectItem value="Bahrain">Bahrain</SelectItem>
-                            <SelectItem value="Bangladesh">Bangladesh</SelectItem>
-                            <SelectItem value="Barbados">Barbados</SelectItem>
-                            <SelectItem value="Belarus">Belarus</SelectItem>
-                            <SelectItem value="Belgium">Belgium</SelectItem>
-                            <SelectItem value="Belize">Belize</SelectItem>
-                            <SelectItem value="Benin">Benin</SelectItem>
-                            <SelectItem value="Bhutan">Bhutan</SelectItem>
-                            <SelectItem value="Bolivia">Bolivia</SelectItem>
-                            <SelectItem value="Bosnia and Herzegovina">Bosnia and Herzegovina</SelectItem>
-                            <SelectItem value="Botswana">Botswana</SelectItem>
-                            <SelectItem value="Brazil">Brazil</SelectItem>
-                            <SelectItem value="Brunei">Brunei</SelectItem>
-                            <SelectItem value="Bulgaria">Bulgaria</SelectItem>
-                            <SelectItem value="Burkina Faso">Burkina Faso</SelectItem>
-                            <SelectItem value="Burundi">Burundi</SelectItem>
-                            <SelectItem value="Cabo Verde">Cabo Verde</SelectItem>
-                            <SelectItem value="Cambodia">Cambodia</SelectItem>
-                            <SelectItem value="Cameroon">Cameroon</SelectItem>
-                            <SelectItem value="Canada">Canada</SelectItem>
-                            <SelectItem value="Central African Republic">Central African Republic</SelectItem>
-                            <SelectItem value="Chad">Chad</SelectItem>
-                            <SelectItem value="Chile">Chile</SelectItem>
-                            <SelectItem value="China">China</SelectItem>
-                            <SelectItem value="Colombia">Colombia</SelectItem>
-                            <SelectItem value="Comoros">Comoros</SelectItem>
-                            <SelectItem value="Congo">Congo</SelectItem>
-                            <SelectItem value="Costa Rica">Costa Rica</SelectItem>
-                            <SelectItem value="Croatia">Croatia</SelectItem>
-                            <SelectItem value="Cuba">Cuba</SelectItem>
-                            <SelectItem value="Cyprus">Cyprus</SelectItem>
-                            <SelectItem value="Czech Republic">Czech Republic</SelectItem>
-                            <SelectItem value="Denmark">Denmark</SelectItem>
-                            <SelectItem value="Djibouti">Djibouti</SelectItem>
-                            <SelectItem value="Dominica">Dominica</SelectItem>
-                            <SelectItem value="Dominican Republic">Dominican Republic</SelectItem>
-                            <SelectItem value="East Timor">East Timor</SelectItem>
-                            <SelectItem value="Ecuador">Ecuador</SelectItem>
-                            <SelectItem value="Egypt">Egypt</SelectItem>
-                            <SelectItem value="El Salvador">El Salvador</SelectItem>
-                            <SelectItem value="Equatorial Guinea">Equatorial Guinea</SelectItem>
-                            <SelectItem value="Eritrea">Eritrea</SelectItem>
-                            <SelectItem value="Estonia">Estonia</SelectItem>
-                            <SelectItem value="Eswatini">Eswatini</SelectItem>
-                            <SelectItem value="Ethiopia">Ethiopia</SelectItem>
-                            <SelectItem value="Fiji">Fiji</SelectItem>
-                            <SelectItem value="Finland">Finland</SelectItem>
-                            <SelectItem value="France">France</SelectItem>
-                            <SelectItem value="Gabon">Gabon</SelectItem>
-                            <SelectItem value="Gambia">Gambia</SelectItem>
-                            <SelectItem value="Georgia">Georgia</SelectItem>
-                            <SelectItem value="Germany">Germany</SelectItem>
-                            <SelectItem value="Ghana">Ghana</SelectItem>
-                            <SelectItem value="Greece">Greece</SelectItem>
-                            <SelectItem value="Grenada">Grenada</SelectItem>
-                            <SelectItem value="Guatemala">Guatemala</SelectItem>
-                            <SelectItem value="Guinea">Guinea</SelectItem>
-                            <SelectItem value="Guinea-Bissau">Guinea-Bissau</SelectItem>
-                            <SelectItem value="Guyana">Guyana</SelectItem>
-                            <SelectItem value="Haiti">Haiti</SelectItem>
-                            <SelectItem value="Honduras">Honduras</SelectItem>
-                            <SelectItem value="Hungary">Hungary</SelectItem>
-                            <SelectItem value="Iceland">Iceland</SelectItem>
-                            <SelectItem value="India">India</SelectItem>
-                            <SelectItem value="Indonesia">Indonesia</SelectItem>
-                            <SelectItem value="Iran">Iran</SelectItem>
-                            <SelectItem value="Iraq">Iraq</SelectItem>
-                            <SelectItem value="Ireland">Ireland</SelectItem>
-                            <SelectItem value="Israel">Israel</SelectItem>
-                            <SelectItem value="Italy">Italy</SelectItem>
-                            <SelectItem value="Jamaica">Jamaica</SelectItem>
-                            <SelectItem value="Japan">Japan</SelectItem>
-                            <SelectItem value="Jordan">Jordan</SelectItem>
-                            <SelectItem value="Kazakhstan">Kazakhstan</SelectItem>
-                            <SelectItem value="Kenya">Kenya</SelectItem>
-                            <SelectItem value="Kiribati">Kiribati</SelectItem>
-                            <SelectItem value="Korea, North">Korea, North</SelectItem>
-                            <SelectItem value="Korea, South">Korea, South</SelectItem>
-                            <SelectItem value="Kosovo">Kosovo</SelectItem>
-                            <SelectItem value="Kuwait">Kuwait</SelectItem>
-                            <SelectItem value="Kyrgyzstan">Kyrgyzstan</SelectItem>
-                            <SelectItem value="Laos">Laos</SelectItem>
-                            <SelectItem value="Latvia">Latvia</SelectItem>
-                            <SelectItem value="Lebanon">Lebanon</SelectItem>
-                            <SelectItem value="Lesotho">Lesotho</SelectItem>
-                            <SelectItem value="Liberia">Liberia</SelectItem>
-                            <SelectItem value="Libya">Libya</SelectItem>
-                            <SelectItem value="Liechtenstein">Liechtenstein</SelectItem>
-                            <SelectItem value="Lithuania">Lithuania</SelectItem>
-                            <SelectItem value="Luxembourg">Luxembourg</SelectItem>
-                            <SelectItem value="Madagascar">Madagascar</SelectItem>
-                            <SelectItem value="Malawi">Malawi</SelectItem>
-                            <SelectItem value="Malaysia">Malaysia</SelectItem>
-                            <SelectItem value="Maldives">Maldives</SelectItem>
-                            <SelectItem value="Mali">Mali</SelectItem>
-                            <SelectItem value="Malta">Malta</SelectItem>
-                            <SelectItem value="Marshall Islands">Marshall Islands</SelectItem>
-                            <SelectItem value="Mauritania">Mauritania</SelectItem>
-                            <SelectItem value="Mauritius">Mauritius</SelectItem>
-                            <SelectItem value="Mexico">Mexico</SelectItem>
-                            <SelectItem value="Micronesia">Micronesia</SelectItem>
-                            <SelectItem value="Moldova">Moldova</SelectItem>
-                            <SelectItem value="Monaco">Monaco</SelectItem>
-                            <SelectItem value="Mongolia">Mongolia</SelectItem>
-                            <SelectItem value="Montenegro">Montenegro</SelectItem>
-                            <SelectItem value="Morocco">Morocco</SelectItem>
-                            <SelectItem value="Mozambique">Mozambique</SelectItem>
-                            <SelectItem value="Myanmar">Myanmar</SelectItem>
-                            <SelectItem value="Namibia">Namibia</SelectItem>
-                            <SelectItem value="Nauru">Nauru</SelectItem>
-                            <SelectItem value="Nepal">Nepal</SelectItem>
-                            <SelectItem value="Netherlands">Netherlands</SelectItem>
-                            <SelectItem value="New Zealand">New Zealand</SelectItem>
-                            <SelectItem value="Nicaragua">Nicaragua</SelectItem>
-                            <SelectItem value="Niger">Niger</SelectItem>
-                            <SelectItem value="Nigeria">Nigeria</SelectItem>
-                            <SelectItem value="North Macedonia">North Macedonia</SelectItem>
-                            <SelectItem value="Norway">Norway</SelectItem>
-                            <SelectItem value="Oman">Oman</SelectItem>
-                            <SelectItem value="Pakistan">Pakistan</SelectItem>
-                            <SelectItem value="Palau">Palau</SelectItem>
-                            <SelectItem value="Palestine">Palestine</SelectItem>
-                            <SelectItem value="Panama">Panama</SelectItem>
-                            <SelectItem value="Papua New Guinea">Papua New Guinea</SelectItem>
-                            <SelectItem value="Paraguay">Paraguay</SelectItem>
-                            <SelectItem value="Peru">Peru</SelectItem>
-                            <SelectItem value="Philippines">Philippines</SelectItem>
-                            <SelectItem value="Poland">Poland</SelectItem>
-                            <SelectItem value="Portugal">Portugal</SelectItem>
-                            <SelectItem value="Qatar">Qatar</SelectItem>
-                            <SelectItem value="Romania">Romania</SelectItem>
-                            <SelectItem value="Russia">Russia</SelectItem>
-                            <SelectItem value="Rwanda">Rwanda</SelectItem>
-                            <SelectItem value="Saint Kitts and Nevis">Saint Kitts and Nevis</SelectItem>
-                            <SelectItem value="Saint Lucia">Saint Lucia</SelectItem>
-                            <SelectItem value="Saint Vincent and the Grenadines">Saint Vincent and the Grenadines</SelectItem>
-                            <SelectItem value="Samoa">Samoa</SelectItem>
-                            <SelectItem value="San Marino">San Marino</SelectItem>
-                            <SelectItem value="Sao Tome and Principe">Sao Tome and Principe</SelectItem>
-                            <SelectItem value="Saudi Arabia">Saudi Arabia</SelectItem>
-                            <SelectItem value="Senegal">Senegal</SelectItem>
-                            <SelectItem value="Serbia">Serbia</SelectItem>
-                            <SelectItem value="Seychelles">Seychelles</SelectItem>
-                            <SelectItem value="Sierra Leone">Sierra Leone</SelectItem>
-                            <SelectItem value="Singapore">Singapore</SelectItem>
-                            <SelectItem value="Slovakia">Slovakia</SelectItem>
-                            <SelectItem value="Slovenia">Slovenia</SelectItem>
-                            <SelectItem value="Solomon Islands">Solomon Islands</SelectItem>
-                            <SelectItem value="Somalia">Somalia</SelectItem>
-                            <SelectItem value="South Africa">South Africa</SelectItem>
-                            <SelectItem value="South Sudan">South Sudan</SelectItem>
-                            <SelectItem value="Spain">Spain</SelectItem>
-                            <SelectItem value="Sri Lanka">Sri Lanka</SelectItem>
-                            <SelectItem value="Sudan">Sudan</SelectItem>
-                            <SelectItem value="Suriname">Suriname</SelectItem>
-                            <SelectItem value="Sweden">Sweden</SelectItem>
-                            <SelectItem value="Switzerland">Switzerland</SelectItem>
-                            <SelectItem value="Syria">Syria</SelectItem>
-                            <SelectItem value="Taiwan">Taiwan</SelectItem>
-                            <SelectItem value="Tajikistan">Tajikistan</SelectItem>
-                            <SelectItem value="Tanzania">Tanzania</SelectItem>
-                            <SelectItem value="Thailand">Thailand</SelectItem>
-                            <SelectItem value="Togo">Togo</SelectItem>
-                            <SelectItem value="Tonga">Tonga</SelectItem>
-                            <SelectItem value="Trinidad and Tobago">Trinidad and Tobago</SelectItem>
-                            <SelectItem value="Tunisia">Tunisia</SelectItem>
-                            <SelectItem value="Turkey">Turkey</SelectItem>
-                            <SelectItem value="Turkmenistan">Turkmenistan</SelectItem>
-                            <SelectItem value="Tuvalu">Tuvalu</SelectItem>
-                            <SelectItem value="Uganda">Uganda</SelectItem>
-                            <SelectItem value="Ukraine">Ukraine</SelectItem>
-                            <SelectItem value="United Arab Emirates">United Arab Emirates</SelectItem>
-                            <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                            <SelectItem value="United States">United States</SelectItem>
-                            <SelectItem value="Uruguay">Uruguay</SelectItem>
-                            <SelectItem value="Uzbekistan">Uzbekistan</SelectItem>
-                            <SelectItem value="Vanuatu">Vanuatu</SelectItem>
-                            <SelectItem value="Vatican City">Vatican City</SelectItem>
-                            <SelectItem value="Venezuela">Venezuela</SelectItem>
-                            <SelectItem value="Vietnam">Vietnam</SelectItem>
-                            <SelectItem value="Yemen">Yemen</SelectItem>
-                            <SelectItem value="Zambia">Zambia</SelectItem>
-                            <SelectItem value="Zimbabwe">Zimbabwe</SelectItem>
+                            {countryList.map((country) => (
+                              <SelectItem key={country} value={country}>{country}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -882,6 +743,73 @@ export default function EditCustomerPage() {
                       </FormItem>
                     )}
                   />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* KYC Tab */}
+            <TabsContent value="kyc">
+              <Card>
+                <CardHeader>
+                  <CardTitle>KYC Verification</CardTitle>
+                  <CardDescription>Review the customer's submitted KYC details and documents. Approve or reject below.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {kycLoading ? (
+                    <Skeleton className="h-8 w-48" />
+                  ) : customer?.kyc ? (
+                    <>
+                      <div className="space-y-2">
+                        <div><b>Status:</b> <span className="capitalize">{customer.kyc.status}</span></div>
+                        <div><b>Full Name:</b> {customer.kyc.fullName}</div>
+                        <div><b>Date of Birth:</b> {customer.kyc.dateOfBirth}</div>
+                        <div><b>Nationality:</b> {customer.kyc.nationality}</div>
+                        <div><b>Tax Country:</b> {customer.kyc.taxCountry}</div>
+                        <div><b>ID Type:</b> {customer.kyc.documentType}</div>
+                        <div><b>ID Number:</b> {customer.kyc.idNumber}</div>
+                      </div>
+                      <Separator />
+                      <div className="space-y-4">
+                        <div>
+                          <b>ID Document (Front):</b>
+                          {customer.kyc.frontUrl ? (
+                            customer.kyc.frontUrl.endsWith('.pdf') ? (
+                              <a href={customer.kyc.frontUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">View PDF</a>
+                            ) : (
+                              <Image src={customer.kyc.frontUrl} alt="ID Front" width={200} height={120} className="rounded border mt-2" />
+                            )
+                          ) : <span className="text-muted-foreground">Not uploaded</span>}
+                        </div>
+                        <div>
+                          <b>ID Document (Back):</b>
+                          {customer.kyc.backUrl ? (
+                            customer.kyc.backUrl.endsWith('.pdf') ? (
+                              <a href={customer.kyc.backUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">View PDF</a>
+                            ) : (
+                              <Image src={customer.kyc.backUrl} alt="ID Back" width={200} height={120} className="rounded border mt-2" />
+                            )
+                          ) : <span className="text-muted-foreground">Not uploaded</span>}
+                        </div>
+                        <div>
+                          <b>Selfie with ID:</b>
+                          {customer.kyc.selfieUrl ? (
+                            customer.kyc.selfieUrl.endsWith('.pdf') ? (
+                              <a href={customer.kyc.selfieUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">View PDF</a>
+                            ) : (
+                              <Image src={customer.kyc.selfieUrl} alt="Selfie" width={200} height={120} className="rounded border mt-2" />
+                            )
+                          ) : <span className="text-muted-foreground">Not uploaded</span>}
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="flex gap-4">
+                        <Button variant="default" disabled={customer.kyc.status === "verified"} onClick={() => handleKycStatus("verified")}>Approve KYC</Button>
+                        <Button variant="destructive" disabled={customer.kyc.status === "rejected"} onClick={() => handleKycStatus("rejected")}>Reject KYC</Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-muted-foreground">No KYC submission found for this customer.</div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

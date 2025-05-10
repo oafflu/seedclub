@@ -423,7 +423,6 @@ export default function RolesAndPermissionsPage() {
             last_name: lastName,
             email: email,
             role: role,
-            encrypted_password: null,
             is_active: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()

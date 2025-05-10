@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Plus, ArrowRight, Filter } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -45,6 +45,27 @@ const mockJars = [
   },
 ]
 
+// MOCK CUSTOMER DATA FOR DEVELOPMENT/DEMO PURPOSES
+const mockCustomer = {
+  id: 'mock-customer-id',
+  firstName: 'Jane',
+  lastName: 'Doe',
+  email: 'jane.doe@example.com',
+}
+
+// Helper for client-only number formatting
+function useClientFormattedNumber(num: number | string | null | undefined) {
+  const [formatted, setFormatted] = useState<string>("")
+  useEffect(() => {
+    if (num === null || num === undefined) return
+    setFormatted("")
+    setTimeout(() => {
+      setFormatted(Number(num).toLocaleString())
+    }, 0)
+  }, [num])
+  return formatted
+}
+
 export default function JarsPage() {
   const [jars, setJars] = useState(mockJars)
   const totalValue = jars.reduce((sum, jar) => sum + jar.currentValue, 0)
@@ -65,7 +86,7 @@ export default function JarsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Total Value</p>
-              <p className="text-2xl font-bold">${totalValue.toLocaleString()}</p>
+              <p className="text-2xl font-bold">{useClientFormattedNumber(totalValue)}</p>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -104,11 +125,11 @@ export default function JarsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Initial Investment</p>
-                  <p className="font-medium">${jar.initialAmount.toLocaleString()}</p>
+                  <p className="font-medium">{useClientFormattedNumber(jar.initialAmount)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Current Value</p>
-                  <p className="font-medium">${jar.currentValue.toLocaleString()}</p>
+                  <p className="font-medium">{useClientFormattedNumber(jar.currentValue)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Start Date</p>

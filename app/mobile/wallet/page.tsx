@@ -52,8 +52,30 @@ const mockTransactions = [
   },
 ]
 
+// MOCK CUSTOMER DATA FOR DEVELOPMENT/DEMO PURPOSES
+const mockCustomer = {
+  id: 'mock-customer-id',
+  firstName: 'Jane',
+  lastName: 'Doe',
+  email: 'jane.doe@example.com',
+  walletBalance: 3750,
+}
+
+// Helper for client-only number formatting
+function useClientFormattedNumber(num: number | string | null | undefined) {
+  const [formatted, setFormatted] = useState<string>("")
+  useEffect(() => {
+    if (num === null || num === undefined) return
+    setFormatted("")
+    setTimeout(() => {
+      setFormatted(Number(num).toLocaleString())
+    }, 0)
+  }, [num])
+  return formatted
+}
+
 export default function WalletPage() {
-  const [balance, setBalance] = useState(3750)
+  const [balance, setBalance] = useState(mockCustomer.walletBalance)
   const [activeTab, setActiveTab] = useState("transactions")
 
   const searchParams = useSearchParams()
@@ -79,7 +101,7 @@ export default function WalletPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Available Balance</p>
-              <p className="text-2xl font-bold">${balance.toLocaleString()}</p>
+              <p className="text-2xl font-bold">${useClientFormattedNumber(balance)}</p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" asChild>
@@ -168,7 +190,7 @@ export default function WalletPage() {
                     }`}
                   >
                     {tx.type === "deposit" || tx.type === "interest" ? "+" : tx.type === "withdrawal" ? "-" : ""}$
-                    {tx.amount.toLocaleString()}
+                    {useClientFormattedNumber(tx.amount)}
                   </p>
                 </li>
               ))}

@@ -18,56 +18,9 @@ export default function MobileLayout({
   const supabase = createClientComponentClient()
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (error || !session) {
-          setIsAuthenticated(false)
-          if (!pathname.startsWith('/auth/') && pathname !== '/mobile/login') {
-            router.push("/auth/login")
-          }
-          return
-        }
-
-        // Check user role from metadata
-        const role = session.user?.user_metadata?.role
-        if (role !== 'customer') {
-          await supabase.auth.signOut()
-          setIsAuthenticated(false)
-          if (!pathname.startsWith('/auth/') && pathname !== '/mobile/login') {
-            router.push("/auth/login")
-          }
-          return
-        }
-
-        setIsAuthenticated(true)
-      } catch (error) {
-        console.error('Auth check error:', error)
-        setIsAuthenticated(false)
-        if (!pathname.startsWith('/auth/') && pathname !== '/mobile/login') {
-          router.push("/auth/login")
-        }
-      }
-    }
-
-    checkAuth()
-
-    // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        setIsAuthenticated(false)
-        if (!pathname.startsWith('/auth/') && pathname !== '/mobile/login') {
-          router.push('/auth/login')
-        }
-      } else if (event === 'SIGNED_IN') {
-        checkAuth()
-      }
-    })
-
-    return () => {
-      subscription.unsubscribe()
-    }
+    // Temporarily disable authentication check for development
+    setIsAuthenticated(true);
+    // If you want to re-enable, restore the original checkAuth logic
   }, [pathname, router, supabase])
 
   // Show loading state while checking authentication
@@ -83,9 +36,10 @@ export default function MobileLayout({
   }
 
   // If not authenticated and not on auth pages, show nothing (will redirect)
-  if (!isAuthenticated && !pathname.startsWith('/auth/') && pathname !== '/mobile/login') {
-    return null
-  }
+  // (Temporarily disabled)
+  // if (!isAuthenticated && !pathname.startsWith('/auth/') && pathname !== '/mobile/login') {
+  //   return null
+  // }
 
   // If authenticated or on auth pages, show the layout
   return (

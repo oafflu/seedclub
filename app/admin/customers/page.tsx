@@ -42,7 +42,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useRouter } from "next/navigation"
-import { CustomerProfile } from "@/lib/services/customer.service"
 import { toast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
@@ -55,8 +54,8 @@ interface FilterOptions {
 export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([])
-  const [viewCustomer, setViewCustomer] = useState<CustomerProfile | null>(null)
-  const [customers, setCustomers] = useState<CustomerProfile[]>([])
+  const [viewCustomer, setViewCustomer] = useState<any>(null)
+  const [customers, setCustomers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("all")
@@ -464,16 +463,17 @@ export default function CustomersPage() {
                       />
                     </TableHead>
                     <TableHead className="w-[100px]">ID</TableHead>
-                    <TableHead>Customer</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>First Name</TableHead>
+                    <TableHead>Last Name</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>KYC Status</TableHead>
-                    <TableHead className="text-right">Total Invested</TableHead>
-                    <TableHead className="text-center">Jars</TableHead>
+                    <TableHead>View</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCustomers.map((customer, idx) => (
+                  {filteredCustomers.map((customer) => (
                     <TableRow key={customer.id}>
                       <TableCell>
                         <Checkbox
@@ -481,192 +481,44 @@ export default function CustomersPage() {
                           onCheckedChange={() => toggleCustomerSelection(customer.id)}
                         />
                       </TableCell>
-                      <TableCell className="font-semibold">
-                        {customer.code || `CUST-${(idx + 1).toString().padStart(3, '0')}`}
+                      <TableCell className="font-mono text-xs">{customer.id}</TableCell>
+                      <TableCell>{customer.email}</TableCell>
+                      <TableCell>{customer.first_name}</TableCell>
+                      <TableCell>{customer.last_name}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant={customer.is_active ? "default" : "outline"}
+                          size="sm"
+                          onClick={async () => {
+                            const response = await fetch(`/api/admin/customers/${customer.id}`, {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ is_active: !customer.is_active }),
+                            })
+                            if (response.ok) loadCustomers()
+                          }}
+                        >
+                          {customer.is_active ? "Active" : "Inactive"}
+                        </Button>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback>{(customer.firstName?.charAt(0) || "?")}</AvatarFallback>
-                          </Avatar>
-                          <div className="flex flex-col">
-                            <span className="font-semibold">{`${customer.firstName} ${customer.lastName}`}</span>
-                            <span className="text-xs text-muted-foreground">{customer.email}</span>
-                          </div>
-                        </div>
+                        {customer.kyc_status}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={customer.status === "active" ? "default" : "secondary"}>
-                            {customer.status}
-                          </Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={async () => {
-                              try {
-                                const response = await fetch(`/api/admin/customers/${customer.id}`, {
-                                  method: "PUT",
-                                  headers: {
-                                    "Content-Type": "application/json",
-                                  },
-                                  body: JSON.stringify({
-                                    id: customer.id,
-                                    status: customer.status === "active" ? "inactive" : "active"
-                                  }),
-                                })
-
-                                if (!response.ok) {
-                                  throw new Error("Failed to update customer status")
-                                }
-
-                                toast({
-                                  title: "Success",
-                                  description: `Customer account ${customer.status === "active" ? "deactivated" : "activated"} successfully.`,
-                                })
-                                loadCustomers()
-                              } catch (error) {
-                                console.error("Error updating customer status:", error)
-                                toast({
-                                  title: "Error",
-                                  description: "Failed to update customer status. Please try again.",
-                                  variant: "destructive",
-                                })
-                              }
-                            }}
-                          >
-                            {customer.status === "active" ? "Deactivate" : "Activate"}
-                          </Button>
-                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => setViewCustomer(customer)}>
+                          <Eye className="h-4 w-4" />
+                          <span className="sr-only">View</span>
+                        </Button>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant={
-                              customer.kycStatus === "verified"
-                                ? "default"
-                                : customer.kycStatus === "pending"
-                                  ? "outline"
-                                  : "destructive"
-                            }
-                          >
-                            {customer.kycStatus}
-                          </Badge>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                Change Status
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onSelect={() => handleUpdateKYCStatus(customer.id, "verified")}>
-                                Mark as Verified
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => handleUpdateKYCStatus(customer.id, "pending")}>
-                                Mark as Pending
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => handleUpdateKYCStatus(customer.id, "rejected")}>
-                                Mark as Rejected
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">${customer.totalInvested?.toLocaleString()}</TableCell>
-                      <TableCell className="text-center">{customer.jars}</TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-2">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="ghost" size="icon" onClick={() => setViewCustomer(customer)}>
-                                <Eye className="h-4 w-4" />
-                                <span className="sr-only">View</span>
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[600px]">
-                              <DialogHeader>
-                                <DialogTitle>Customer Details</DialogTitle>
-                                <DialogDescription>Detailed information about the customer.</DialogDescription>
-                              </DialogHeader>
-                              {viewCustomer && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                                  <div className="flex flex-col items-start gap-4 md:col-span-1">
-                                    <div className="flex items-center gap-4">
-                                      <Avatar className="h-16 w-16">
-                                        <AvatarFallback className="text-lg">{viewCustomer.firstName?.charAt(0) || "?"}</AvatarFallback>
-                                      </Avatar>
-                                      <div>
-                                        <h3 className="text-lg font-semibold">{viewCustomer.firstName || "N/A"} {viewCustomer.lastName || ""}</h3>
-                                        <div className="text-xs text-muted-foreground">{viewCustomer.email || "N/A"}</div>
-                                      </div>
-                                    </div>
-                                    <div className="text-sm text-muted-foreground mt-2">
-                                      <span className="font-medium">Phone:</span> {viewCustomer.phone || "N/A"}
-                                    </div>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-x-6 gap-y-2 md:col-span-1 text-sm">
-                                    <div className="font-medium text-muted-foreground">Customer ID</div>
-                                    <div>{viewCustomer.id}</div>
-                                    <div className="font-medium text-muted-foreground">Phone</div>
-                                    <div>{viewCustomer.phone || "N/A"}</div>
-                                    <div className="font-medium text-muted-foreground">Join Date</div>
-                                    <div>{viewCustomer.createdAt ? new Date(viewCustomer.createdAt).toISOString().split('T')[0] : "N/A"}</div>
-                                    <div className="font-medium text-muted-foreground">Status</div>
-                                    <div><Badge variant={viewCustomer.status === "active" ? "default" : "secondary"}>{viewCustomer.status}</Badge></div>
-                                    <div className="font-medium text-muted-foreground">KYC Status</div>
-                                    <div><Badge variant={viewCustomer.kycStatus === "verified" ? "default" : viewCustomer.kycStatus === "pending" ? "outline" : "destructive"}>{viewCustomer.kycStatus}</Badge></div>
-                                    <div className="font-medium text-muted-foreground">Total Invested</div>
-                                    <div>${viewCustomer.totalInvested?.toLocaleString() || "0.00"}</div>
-                                  </div>
-                                </div>
-                              )}
-                              <DialogFooter className="flex flex-row justify-end gap-2">
-                                <Button
-                                  variant="outline"
-                                  onClick={() => router.push(`/admin/customers/edit/${viewCustomer?.code}`)}
-                                >
-                                  Edit Customer
-                                </Button>
-                                <Button onClick={() => router.push(`/admin/customers/${viewCustomer?.id}/investments`)}>
-                                  View Investments
-                                </Button>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => router.push(`/admin/customers/edit/${customer.code}`)}
-                          >
-                            <Edit className="h-4 w-4" />
-                            <span className="sr-only">Edit</span>
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">More</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onSelect={() => handleSendEmail(customer.id)}>
-                                <Mail className="mr-2 h-4 w-4" /> Email Customer
-                              </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <a href={`tel:${customer.phone || ''}`}>
-                                  <Phone className="mr-2 h-4 w-4" /> Call Customer
-                                </a>
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onSelect={() => handleDeleteCustomer(customer.id)}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete Customer
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => router.push(`/admin/customers/edit/${customer.id}`)}
+                        >
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Edit</span>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -676,6 +528,28 @@ export default function CustomersPage() {
           )}
         </CardContent>
       </Card>
+
+      {viewCustomer && (
+        <Dialog open={!!viewCustomer} onOpenChange={() => setViewCustomer(null)}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Customer Details</DialogTitle>
+              <DialogDescription>View and manage customer details</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-1 gap-4 py-4">
+              <div><b>ID:</b> {viewCustomer.id}</div>
+              <div><b>Email:</b> {viewCustomer.email}</div>
+              <div><b>First Name:</b> {viewCustomer.first_name}</div>
+              <div><b>Last Name:</b> {viewCustomer.last_name}</div>
+              <div><b>Status:</b> {viewCustomer.is_active ? "Active" : "Inactive"}</div>
+              <div><b>KYC Status:</b> {viewCustomer.kyc_status}</div>
+            </div>
+            <DialogFooter>
+              <Button type="submit" onClick={() => setViewCustomer(null)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }
